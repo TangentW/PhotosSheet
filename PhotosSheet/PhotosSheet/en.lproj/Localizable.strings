@@ -1,0 +1,11 @@
+/* 
+  Localizable.strings
+  PhotosSheet
+
+  Created by Tan on 2017/8/13.
+
+*/
+
+"Fetching photos from iCloud" = "Fetching photos from iCloud";
+"Confirm" = "Confirm";
+"Send" = "Send";
