@@ -67,7 +67,7 @@ extension PhotosSheet.PhotosDisplayController {
         fileprivate var _preRequestId: PHImageRequestID?
         fileprivate var _hideCheckbox = false
 
-        lazy var hideCheckbox: (Bool) -> () = {
+        lazy private(set) var hideCheckbox: (Bool) -> () = {
             return { [weak self] hide in
                 self?._hideCheckbox = hide
                 if let model = self?.model, model.didSelected {

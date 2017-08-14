@@ -59,6 +59,7 @@
 				BAD8AC491F41E6910040C4AB /* Model.swift */,
 				BAD8AC3F1F41E1020040C4AB /* UI.swift */,
 				BA7DF8191F41A0BD00D5245A /* ProgressViewController.swift */,
+				BAD8AC431F41E1B30040C4AB /* Tools.swift */,
 			);
 			path = Classes;
 			sourceTree = "<group>";
@@ -85,7 +86,6 @@
 				BAD8AC4B1F41E7B90040C4AB /* Classes */,
 				BAE74EC41F3F7C4E000C9814 /* Info.plist */,
 				BAE74ECB1F3F7C62000C9814 /* Images.xcassets */,
-				BAD8AC431F41E1B30040C4AB /* Tools.swift */,
 				BAE74F021F401E5C000C9814 /* Localizable.strings */,
 			);
 			path = PhotosSheet;

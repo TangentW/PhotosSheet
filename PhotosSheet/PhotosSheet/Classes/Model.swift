@@ -24,7 +24,6 @@ extension PhotosSheet {
 
         var didChangedSelected: ((Bool) -> ())?
         var downloadProgressCallback: ((Double) -> ())?
-        var calcSizeCompletedCallback: (() -> ())?
 
         init(asset: PHAsset) {
             self.asset = asset
@@ -48,7 +47,7 @@ extension PhotosSheet.Model: Hashable {
 
 extension PhotosSheet.Model {
     // !!Synchronous!! Do not call in main thread
-    func fetchAssetFromLocalOrCloud() -> (PHAsset, UIImage)? {
+    func fetchPhotoFromLocalOrCloud() -> (PHAsset, UIImage)? {
         _semaphore.wait()
         defer {
             _semaphore.signal()
@@ -70,5 +69,18 @@ extension PhotosSheet.Model {
         if let task = _downloadTask {
             PHImageManager.default().cancelImageRequest(task)
         }
+    }
+}
+
+extension Array where Element == PhotosSheet.Model {
+    func fetchPhotos(completionHandler: @escaping ([(PHAsset, UIImage)]) -> ()) -> DispatchWorkItem {
+        let workItem = DispatchWorkItem {
+            let photos = self.flatMap { $0.fetchPhotoFromLocalOrCloud() }
+            DispatchQueue.main.async {
+                completionHandler(photos)
+            }
+        }
+        DispatchQueue.global().async(execute: workItem)
+        return workItem
     }
 }

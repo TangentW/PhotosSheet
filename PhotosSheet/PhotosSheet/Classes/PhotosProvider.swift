@@ -71,9 +71,7 @@ extension PhotosSheet.PhotosProvider {
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: "PhotoItem", for: indexPath) as! PhotosSheet.PhotosDisplayController.PhotoItemView
         cell.model = _models[indexPath.row]
         _contentOffsetObserbers.insert(cell)
-        if _hideCheckBoxEvents[cell] == nil {
-            _hideCheckBoxEvents[cell] = cell.hideCheckbox
-        }
+        _hideCheckBoxEvents[cell] = cell.hideCheckbox
         return cell
     }
 }

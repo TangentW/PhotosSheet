@@ -24,7 +24,8 @@ extension PhotosSheet {
         fileprivate var _selectedModels: [Model] = []
         var didSelectedPhotos: (([(PHAsset, UIImage)]) -> ())?
 
-        fileprivate var _imagesLoadingWorkItem: DispatchWorkItem?
+        // WorkItem For Fetching Photos
+        fileprivate var _photosFetchingWorkItem: DispatchWorkItem?
 
         fileprivate let _displayedPhotosLimit: Int
         fileprivate let _selectedPhotosLimit: Int
@@ -42,7 +43,7 @@ extension PhotosSheet {
         }
 
         deinit {
-            _imagesLoadingWorkItem?.cancel()
+            _photosFetchingWorkItem?.cancel()
         }
 
         required init?(coder aDecoder: NSCoder) {
@@ -101,7 +102,7 @@ extension PhotosSheet {
         fileprivate lazy var _sendPhotoBtn: ActionItem = {
             let firstItemColor = self._normalActionItems.first?._action.tintColor ?? .green
             let action = Action(title: "Send".localizedString, tintColor: firstItemColor, action: { [weak self] in
-                self?._sendBtnAction()
+                self?._sendPhotosAction()
             })
             let view = ActionItem(action: action)
             view.isHidden = true
@@ -111,7 +112,7 @@ extension PhotosSheet {
         fileprivate lazy var _sendOriginalsBtn: ActionItem = {
             let firstItemColor = self._normalActionItems.first?._action.tintColor ?? .green
             let action = Action(title: "Send Originals".localizedString, tintColor: firstItemColor, action: { [weak self] in
-                self?._sendBtnAction()
+                self?._sendPhotosAction()
             })
             let view = ActionItem(action: action)
             view.isHidden = true
@@ -253,24 +254,26 @@ fileprivate extension PhotosSheet.ContentController {
 
     func _calcTotalSizeAndDisplayOnSendOriginalsBtn() {
         _selectedModels.forEach { model in
-            model.calcSizeCompletedCallback = { [weak self] in
-                let size = self?._selectedModels.reduce(0) { p, n in n.size + p }
-                let bcf = ByteCountFormatter()
-                bcf.allowedUnits = [.useMB]
-                bcf.countStyle = .file
-                let sizeString = size == nil ? "" : "(" + bcf.string(fromByteCount: Int64(size!)) + ")"
-                self?._sendOriginalsBtn.setTitle("Send Originals".localizedString + "\n" + sizeString, for: .normal)
-            }
+//            model.calcSizeCompletedCallback = { [weak self] in
+//                let size = self?._selectedModels.reduce(0) { p, n in n.size + p }
+//                let bcf = ByteCountFormatter()
+//                bcf.allowedUnits = [.useMB]
+//                bcf.countStyle = .file
+//                let sizeString = size == nil ? "" : "(" + bcf.string(fromByteCount: Int64(size!)) + ")"
+//                self?._sendOriginalsBtn.setTitle("Send Originals".localizedString + "\n" + sizeString, for: .normal)
+//            }
         }
     }
 
-    func _sendBtnAction() {
+    func _sendPhotosAction() {
         showProgressViewControllerCallback?()
         _setupProgressListening()
-        _fetchAllPhotos { [weak self] photos in
+        _photosFetchingWorkItem = _selectedModels.fetchPhotos(completionHandler: { [weak self] photos in
+            // Send Photos
             self?.progressUpdateCallback?(1)
-            self?._sendPhotosAction(photos: photos)
-        }
+            self?.didSelectedPhotos?(photos)
+            self?._dismiss()
+        })
     }
 
     func _setupProgressListening() {
@@ -285,22 +288,6 @@ fileprivate extension PhotosSheet.ContentController {
                 self?.progressUpdateCallback?(max(0.15, totalProgress))
             }
         }
-    }
-
-    func _fetchAllPhotos(completionHandler: @escaping ([(PHAsset, UIImage)]) -> ()) {
-        let workItem = DispatchWorkItem { [weak self] in
-            let photos = self?._selectedModels.flatMap { $0.fetchAssetFromLocalOrCloud() } ?? []
-            DispatchQueue.main.async {
-                completionHandler(photos)
-            }
-        }
-        DispatchQueue.global().async(execute: workItem)
-        _imagesLoadingWorkItem = workItem
-    }
-
-    func _sendPhotosAction(photos: [(PHAsset, UIImage)]) {
-        didSelectedPhotos?(photos)
-        _dismiss()
     }
 }
 

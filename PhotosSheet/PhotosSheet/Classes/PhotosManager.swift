@@ -12,7 +12,7 @@ import Photos
 extension PhotosSheet {
     final class PhotosManager {
         static let shared = PhotosManager()
-        init() { }
+        private init() { }
     }
 }
 
