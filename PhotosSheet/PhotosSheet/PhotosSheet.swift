@@ -256,11 +256,18 @@ extension PhotosSheet {
             return view
         }()
 
-        // Send Photo
+        // Fetching Photos from iCloud Alert Controller
+        fileprivate lazy var _fetchingTipAlertController: UIAlertController = {
+            let alertController = UIAlertController(title: "Fetching photos from iCloud"._localizedString, message: nil, preferredStyle: .alert)
+            alertController.addAction(UIAlertAction(title: "Confirm"._localizedString, style: .default, handler: nil))
+            return alertController
+        }()
+
+        // Send Photo Button
         fileprivate lazy var _sendPhotoBtn: _ActionItem = {
             let firstItemColor = self._normalActionItems.first?._action.tintColor ?? .green
             let action = Action(title: "", tintColor: firstItemColor, action: { [weak self] in
-                self?._sendPhotosAction()
+                self?._sendBtnAction()
             })
             let view = _ActionItem(action: action)
             view.isHidden = true
@@ -383,8 +390,30 @@ fileprivate extension PhotosSheet.ContentController {
         }
     }
 
+    func _sendBtnAction() {
+        guard self._checkCanSendPhoto() else {
+            // Show Fecting tip Alert Controller
+            present(_fetchingTipAlertController, animated: true, completion: nil)
+            _waitingForDownloadThenSend()
+            return
+        }
+        _sendPhotosAction()
+    }
+
+    func _waitingForDownloadThenSend() {
+        for model in selectedModels {
+            model.downloadCompletedCallback = { [weak self] in
+                guard let `self` = self else { return }
+                if self._checkCanSendPhoto() {
+                    self.selectedModels.forEach { $0.downloadCompletedCallback = nil }
+                    self._fetchingTipAlertController.dismiss(animated: true, completion: nil)
+                    self._sendPhotosAction()
+                }
+            }
+        }
+    }
+
     func _sendPhotosAction() {
-        guard self._checkCanSendPhoto() else { return }
         let assets = selectedModels.map { $0.asset }
         didSelectedAssets?(assets)
         if let didSelectedImages = didSelectedImages {
@@ -405,11 +434,6 @@ fileprivate extension PhotosSheet.ContentController {
                 isOK = false
                 break
             }
-        }
-        if !isOK {
-            let alertController = UIAlertController(title: "Fetching photos from iCloud"._localizedString, message: nil, preferredStyle: .alert)
-            alertController.addAction(UIAlertAction(title: "Confirm"._localizedString, style: .default, handler: nil))
-            present(alertController, animated: true, completion: nil)
         }
         return isOK
     }
@@ -540,7 +564,7 @@ extension PhotosSheet {
             didSet {
                 guard let model = model, oldValue != model else { return }
                 // 加载缩略图
-                _preRequestId = PhotosManager.shared.fetchPhoto(with: model.asset, type: .thumbnail(height: photoItemHeight, progressHandler: { _, _ in }), completion: { [weak self] image in
+                _preRequestId = PhotosManager.shared.fetchPhoto(with: model.asset, type: .thumbnail(height: photoItemHeight), completion: { [weak self] image in
                     // 会走两次，第一次是获取本地质量略差的缩略图，第二次是获取Cloud质量不错的缩略图
                     self?.mContentView.image = image
                 })
@@ -739,6 +763,7 @@ extension PhotosSheet.PhotosProvider {
 
         var didChangedSelected: ((Bool) -> ())?
         var downloadProgressCallback: ((Double) -> ())?
+        var downloadCompletedCallback: (() -> ())?
 
         init(asset: PHAsset) {
             self.asset = asset
@@ -763,11 +788,11 @@ extension PhotosSheet.PhotosProvider.Model: Hashable {
 extension PhotosSheet.PhotosProvider.Model {
     func downloadAssetFromCloud() {
         guard downloadTask == nil else { return }
-        downloadTask = PhotosSheet.PhotosManager.shared.fetchPhoto(with: asset, type: .original(progressHandler: { [weak self] progress, _ in
+        downloadTask = PhotosSheet.PhotosManager.shared.fetchPhoto(with: asset, type: .original, progressHandler: { [weak self] progress, _ in
             DispatchQueue.main.async {
                 self?.downloadProgressCallback?(progress)
             }
-        })) { [weak self] _ in self?.isDownloadCompleted = true }
+        }) { [weak self] _ in self?.isDownloadCompleted = true; self?.downloadCompletedCallback?() }
     }
 
     func cancelDownload() {
@@ -849,31 +874,28 @@ extension PhotosSheet {
 extension PhotosSheet.PhotosManager {
     // ResultImage, Info, IsDegraded
     typealias ImageRequestCompletion = (UIImage) -> ()
-    // Progress, Error, Stop, Info
+    // Progress, Stop
     typealias ImageDownloadProgressHandler = (Double, UnsafeMutablePointer<ObjCBool>) -> ()
 
     @discardableResult
-    func fetchPhoto(with asset: PHAsset, type: PhotoFetchType, isSynchronous: Bool = false, completion: @escaping ImageRequestCompletion) -> PHImageRequestID {
+    func fetchPhoto(with asset: PHAsset, type: PhotoFetchType, isSynchronous: Bool = false, progressHandler: ImageDownloadProgressHandler? = nil, completion: @escaping ImageRequestCompletion) -> PHImageRequestID {
         let option = PHImageRequestOptions()
         option.isSynchronous = isSynchronous
+        option.progressHandler = { progress, _, stop, _ in
+            progressHandler?(progress, stop)
+        }
         let targetSize: CGSize
         switch type {
-        case let .thumbnail(height, progressHandler):
+        case .thumbnail(let height):
             let ratio = CGFloat(asset.pixelWidth) / CGFloat(asset.pixelHeight)
             let scale = UIScreen.main.scale
             targetSize = CGSize(width: height * ratio * scale, height: height * scale)
             option.resizeMode = .fast
             option.deliveryMode = .opportunistic
             option.isNetworkAccessAllowed = true
-            option.progressHandler = { progress, _, stop, _ in
-                progressHandler(progress, stop)
-            }
-        case let .original(progressHandler):
+        case .original:
             option.deliveryMode = .highQualityFormat
             option.isNetworkAccessAllowed = true
-            option.progressHandler = { progress, _, stop, _ in
-                progressHandler(progress, stop)
-            }
             targetSize = PHImageManagerMaximumSize
         }
 
@@ -903,8 +925,8 @@ extension PhotosSheet.PhotosManager {
 
 extension PhotosSheet.PhotosManager {
     enum PhotoFetchType {
-        case thumbnail(height: CGFloat, progressHandler: ImageDownloadProgressHandler)
-        case original(progressHandler: ImageDownloadProgressHandler)
+        case thumbnail(height: CGFloat)
+        case original
     }
 }
 
@@ -983,7 +1005,7 @@ fileprivate extension Array where Element == PHAsset {
         queue.async {
             var images: [UIImage] = []
             self.forEach { asset in
-                PhotosSheet.PhotosManager.shared.fetchPhoto(with: asset, type: .original(progressHandler: { _, _ in }), isSynchronous: true, completion: { image in
+                PhotosSheet.PhotosManager.shared.fetchPhoto(with: asset, type: .original, isSynchronous: true, completion: { image in
                     images.append(image)
                 })
             }
