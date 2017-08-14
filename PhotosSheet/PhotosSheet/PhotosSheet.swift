@@ -9,6 +9,37 @@
 import UIKit
 import Photos
 
+// MARK: - UI Options
+public extension PhotosSheet {
+    enum UIOption: Hashable {
+        case photoItemCheckboxRightMargin(CGFloat)
+        case photoItemCheckboxBottomMargin(CGFloat)
+        case photoItemHeight(CGFloat)
+        case actionSheetFont(UIFont)
+        case actionSheetCorners(CGFloat)
+        case actionSheetHorizontalMargin(CGFloat)
+        case actionSheetVerticalMargin(CGFloat)
+        case actionSheetItemHeight(CGFloat)
+
+        public var hashValue: Int {
+            switch self {
+            case .photoItemCheckboxRightMargin : return 0
+            case .photoItemCheckboxBottomMargin : return 1
+            case .photoItemHeight : return 2
+            case .actionSheetFont : return 3
+            case .actionSheetCorners : return 4
+            case .actionSheetHorizontalMargin : return 5
+            case .actionSheetVerticalMargin : return 6
+            case .actionSheetItemHeight : return 7
+            }
+        }
+
+        public static func ==(lhs: PhotosSheet.UIOption, rhs: PhotosSheet.UIOption) -> Bool {
+            return lhs.hashValue == rhs.hashValue
+        }
+    }
+}
+
 public final class PhotosSheet: UIViewController {
     /// All actions in action sheet.
     public let actions: [PhotosSheet.Action]
@@ -19,13 +50,19 @@ public final class PhotosSheet: UIViewController {
     ///   - actions: Actions in action sheet.
     ///   - displayedPhotosLimit: The max count of photos displayed, default is `0`, means unlimited.
     ///   - selectedPhotosLimit: The max count of photos that can be selected, default is `9`.
+    ///   - options: UI options. See `UIOption`
     ///   - didSelectedAssets: Called after you have selected the photos, output assets.
     ///   - didSelectedImages: Called after you have selected the photos, output images.
     public init(actions: [PhotosSheet.Action],
                 displayedPhotosLimit: Int = 0,
                 selectedPhotosLimit: Int = 9,
+                options: Set<UIOption>? = nil,
                 didSelectedAssets: (([PHAsset]) -> ())? = nil,
                 didSelectedImages: (([UIImage]) -> ())? = nil) {
+        // SetupUI
+        if let options = options {
+            PhotosSheet._setupUI(options: options)
+        }
         self.actions = actions
         _contentController = ContentController(actions: actions, displayedPhotosLimit: displayedPhotosLimit, selectedPhotosLimit: selectedPhotosLimit)
         _contentController.didSelectedAssets = didSelectedAssets
@@ -57,7 +94,6 @@ public final class PhotosSheet: UIViewController {
 
     fileprivate var _contentController: ContentController!
 }
-
 
 public extension PhotosSheet {
     override func viewDidLoad() {
@@ -114,7 +150,7 @@ extension PhotosSheet {
             backgroundColor = UIColor.white.withAlphaComponent(0.9)
             setTitle(_action.title, for: .normal)
             setTitleColor(_action.tintColor, for: .normal)
-            titleLabel?.font = photosSheetItemFont
+            titleLabel?.font = PhotosSheet.actionSheetFont
             self.autoresizingMask = .flexibleWidth
             addTarget(self, action: #selector(_ActionItem.doAction), for: .touchUpInside)
             addTarget(self, action: #selector(_ActionItem.switchToActive), for: .touchDown)
@@ -157,7 +193,7 @@ extension PhotosSheet {
         fileprivate let _selectedPhotosLimit: Int
 
         fileprivate var _photosDisplayViewHeight: CGFloat = UIApplication.shared.statusBarOrientation == .portrait
-            ? photosSheetPhotosViewHeightForNormal : 0
+            ? PhotosSheet.photoItemHeight : 0
 
         init(actions: [Action], displayedPhotosLimit: Int, selectedPhotosLimit: Int) {
             _displayedPhotosLimit = displayedPhotosLimit
@@ -207,7 +243,7 @@ extension PhotosSheet {
         fileprivate lazy var _contentViewForNormal: UIView = {
             let view = UIView()
             view.layer.masksToBounds = true
-            view.layer.cornerRadius = photosSheetCorners
+            view.layer.cornerRadius = PhotosSheet.actionSheetCorners
             view.autoresizingMask = .flexibleWidth
             return view
         }()
@@ -215,14 +251,15 @@ extension PhotosSheet {
         fileprivate lazy var _contentViewForCancel: UIView = {
             let view = UIView()
             view.layer.masksToBounds = true
-            view.layer.cornerRadius = photosSheetCorners
+            view.layer.cornerRadius = PhotosSheet.actionSheetCorners
             view.autoresizingMask = .flexibleWidth
             return view
         }()
 
         // Send Photo
         fileprivate lazy var _sendPhotoBtn: _ActionItem = {
-            let action = Action(title: "", tintColor: .green, action: { [weak self] in
+            let firstItemColor = self._normalActionItems.first?._action.tintColor ?? .green
+            let action = Action(title: "", tintColor: firstItemColor, action: { [weak self] in
                 self?._sendPhotosAction()
             })
             let view = _ActionItem(action: action)
@@ -272,17 +309,17 @@ extension PhotosSheet {
 
 fileprivate extension PhotosSheet.ContentController {
     var _expectHeight: CGFloat {
-        return _contentViewHeightForNormal + _contentViewHeightForCancel + photosSheetVerticalOffset
+        return _contentViewHeightForNormal + _contentViewHeightForCancel + PhotosSheet.actionSheetVerticalMargin
     }
 
     var _contentViewHeightForNormal: CGFloat {
         let itemCount = _normalActionItems.count
-        return CGFloat(itemCount) * photosSheetItemHeight + CGFloat(itemCount - 1) * 0.5 + _photosDisplayViewHeight
+        return CGFloat(itemCount) * PhotosSheet.actionSheetItemHeight + CGFloat(itemCount - 1) * 0.5 + _photosDisplayViewHeight
     }
 
     var _contentViewHeightForCancel: CGFloat {
         let itemCount = _cancelActionItems.count
-        return CGFloat(itemCount) * photosSheetItemHeight + CGFloat(itemCount - 1) * 0.5
+        return CGFloat(itemCount) * PhotosSheet.actionSheetItemHeight + CGFloat(itemCount - 1) * 0.5
     }
 
     func _setupGestureRecognizer() {
@@ -315,24 +352,25 @@ fileprivate extension PhotosSheet.ContentController {
     func _layoutViews() {
         _photosDisplayController.view.frame = CGRect(x: 0, y: 0, width: view.bounds.width, height: _photosDisplayViewHeight)
         _contentViewForNormal.frame = CGRect(x: 0, y: 0, width: view.bounds.width, height: _contentViewHeightForNormal)
-        _contentViewForCancel.frame = CGRect(x: 0, y: _contentViewForNormal.frame.maxY + photosSheetVerticalOffset, width: view.bounds.width, height: _contentViewHeightForCancel)
+        _contentViewForCancel.frame = CGRect(x: 0, y: _contentViewForNormal.frame.maxY + PhotosSheet.actionSheetVerticalMargin, width: view.bounds.width, height: _contentViewHeightForCancel)
         _blurViewForNormal.frame = _contentViewForNormal.bounds
         _blurViewForCancel.frame = _contentViewForCancel.bounds
         _normalActionItems.enumerated().forEach { index, view in
-            view.frame = CGRect(x: 0, y: CGFloat(index) * (photosSheetItemHeight + 0.5) + _photosDisplayViewHeight, width: self.view.bounds.width, height: photosSheetItemHeight)
+            view.frame = CGRect(x: 0, y: CGFloat(index) * (PhotosSheet.actionSheetItemHeight + 0.5) + _photosDisplayViewHeight, width: self.view.bounds.width, height: PhotosSheet.actionSheetItemHeight)
         }
         _cancelActionItems.enumerated().forEach { index, view in
-            view.frame = CGRect(x: 0, y: CGFloat(index) * (photosSheetItemHeight + 0.5), width: self.view.bounds.width, height: photosSheetItemHeight)
+            view.frame = CGRect(x: 0, y: CGFloat(index) * (PhotosSheet.actionSheetItemHeight + 0.5), width: self.view.bounds.width, height: PhotosSheet.actionSheetItemHeight)
         }
 
-        _sendPhotoBtn.frame = CGRect(x: 0, y: _photosDisplayViewHeight, width: view.bounds.width, height: photosSheetItemHeight)
+        _sendPhotoBtn.frame = CGRect(x: 0, y: _photosDisplayViewHeight, width: view.bounds.width, height: PhotosSheet.actionSheetItemHeight)
     }
 }
 
 fileprivate extension PhotosSheet.ContentController {
     func _switchToShowSendButton(assetsCount: Int) {
         let isShow = assetsCount > 0
-        if let firstItem = _normalActionItems.first { // 必须当ActionSheet至少有一个Action的时候才显示发送按钮
+        // 必须当ActionSheet至少有一个Action的时候才显示发送按钮
+        if let firstItem = _normalActionItems.first {
             if !isShow {
                 firstItem.isHidden = false
                 _sendPhotoBtn.isHidden = true
@@ -380,8 +418,8 @@ fileprivate extension PhotosSheet.ContentController {
 extension PhotosSheet.ContentController {
     func show(from viewController: UIViewController) {
         let height = _expectHeight
-        let expireY = viewController.view.bounds.height - photosSheetVerticalOffset - height
-        view.frame = CGRect(x: photosSheetHorizontalOffset, y: viewController.view.bounds.height, width: viewController.view.bounds.width - 2 * photosSheetHorizontalOffset, height: height)
+        let expireY = viewController.view.bounds.height - PhotosSheet.actionSheetVerticalMargin - height
+        view.frame = CGRect(x: PhotosSheet.actionSheetHorizontalMargin, y: viewController.view.bounds.height, width: viewController.view.bounds.width - 2 * PhotosSheet.actionSheetHorizontalMargin, height: height)
         viewController.addChildViewController(self)
         viewController.view.addSubview(view)
         UIView.animate(withDuration: 0.25) {
@@ -457,7 +495,8 @@ extension PhotosSheet.PhotosDisplayController {
 
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
-        DispatchQueue.main.async {  // 放在下一个Runtime周期，对所有显示出来的CollectionViewCell中的Checkbox进行布局
+        // 放在下一个Runloop周期，对所有显示出来的CollectionViewCell中的Checkbox进行布局
+        DispatchQueue.main.async {
             self._photosDisplayView.delegate?.scrollViewDidScroll?(self._photosDisplayView)
         }
     }
@@ -552,7 +591,7 @@ extension PhotosSheet {
             super.layoutSubviews()
             mContentView.frame = bounds
             checkbox.sizeToFit()
-            checkbox.frame.origin = CGPoint(x: bounds.width - checkbox.bounds.width - checkboxOffset, y: bounds.height - checkbox.bounds.height - checkboxOffset)
+            checkbox.frame.origin = CGPoint(x: bounds.width - checkbox.bounds.width - PhotosSheet.photoItemCheckboxRightMargin, y: bounds.height - checkbox.bounds.height - PhotosSheet.photoItemCheckboxBottomMargin)
             progressView.center = CGPoint(x: 0.5 * bounds.width, y: 0.5 * bounds.height)
         }
 
@@ -633,13 +672,13 @@ extension PhotosSheet {
 extension PhotosSheet.PhotoItemView: PhotosDisplayViewContentOffsetObserver {
     func displayView(_ displayView: UICollectionView, onContentOffsetChange contentOffset: CGPoint) {
         let displayViewWidth = displayView.bounds.width
-        let x = min(max(displayViewWidth - (frame.origin.x - contentOffset.x) - checkbox.bounds.width - checkboxOffset, checkboxOffset), bounds.width - checkbox.bounds.width - checkboxOffset)
+        let x = min(max(displayViewWidth - (frame.origin.x - contentOffset.x) - checkbox.bounds.width - PhotosSheet.photoItemCheckboxRightMargin, PhotosSheet.photoItemCheckboxRightMargin), bounds.width - checkbox.bounds.width - PhotosSheet.photoItemCheckboxBottomMargin)
         checkbox.frame.origin.x = x
     }
 }
 
 // MARK: - PhotosProvider
-fileprivate let photoItemHeight = photosSheetPhotosViewHeightForNormal
+fileprivate let photoItemHeight = PhotosSheet.photoItemHeight
 extension PhotosSheet {
     final class PhotosProvider: NSObject, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
         fileprivate var _models: [Model] = []
@@ -885,6 +924,45 @@ extension PhotosSheet.PhotosManager {
     }
 }
 
+// MARK: - UI Setting
+fileprivate extension PhotosSheet {
+    fileprivate(set) static var photoItemCheckboxRightMargin: CGFloat = 5
+    fileprivate(set) static var photoItemCheckboxBottomMargin: CGFloat = 5
+    fileprivate(set) static var photoItemHeight: CGFloat = (UIScreen.main.bounds.width - 2 * PhotosSheet.actionSheetHorizontalMargin) * 0.7
+    fileprivate(set) static var actionSheetFont = UIFont.systemFont(ofSize: 20)
+    fileprivate(set) static var actionSheetCorners: CGFloat = 12
+    fileprivate(set) static var actionSheetHorizontalMargin: CGFloat = 10
+    fileprivate(set) static var actionSheetVerticalMargin: CGFloat = 8
+    fileprivate(set) static var actionSheetItemHeight: CGFloat = 57
+}
+
+fileprivate extension PhotosSheet {
+    static func _setupUI(options: Set<UIOption>) {
+        func pair(option: UIOption) {
+            switch option {
+            case .photoItemCheckboxRightMargin(let value):
+                photoItemCheckboxRightMargin = value
+            case .photoItemCheckboxBottomMargin(let value):
+                photoItemCheckboxBottomMargin = value
+            case .photoItemHeight(let value):
+                photoItemHeight = value
+            case .actionSheetFont(let value):
+                actionSheetFont = value
+            case .actionSheetCorners(let value):
+                actionSheetCorners = value
+            case .actionSheetHorizontalMargin(let value):
+                actionSheetHorizontalMargin = value
+            case .actionSheetVerticalMargin(let value):
+                actionSheetVerticalMargin = value
+            case .actionSheetItemHeight(let value):
+                actionSheetItemHeight = value
+            }
+        }
+
+        options.forEach(pair)
+    }
+}
+
 // MARK: - Tools
 fileprivate extension UIImage {
     func _scaleTo(size: CGSize) -> UIImage? {
@@ -927,14 +1005,3 @@ fileprivate extension String {
         return NSLocalizedString(self, bundle: Bundle._myBundle, comment: "")
     }
 }
-
-// MARK: - UI
-fileprivate let photosSheetCorners: CGFloat = 12
-fileprivate let photosSheetItemHeight: CGFloat = 57
-fileprivate let photosSheetHorizontalOffset: CGFloat = 10
-fileprivate let photosSheetVerticalOffset: CGFloat = 8
-fileprivate let photosSheetItemFont = UIFont.systemFont(ofSize: 20)
-// 2 : 1
-fileprivate let photosSheetPhotosViewHeightForNormal: CGFloat = (UIScreen.main.bounds.width - 2 * photosSheetHorizontalOffset) * 0.7
-
-fileprivate let checkboxOffset: CGFloat = 5
