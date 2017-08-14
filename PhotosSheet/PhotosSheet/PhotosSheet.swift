@@ -51,25 +51,54 @@ public final class PhotosSheet: UIViewController {
     ///   - displayedPhotosLimit: The max count of photos displayed, default is `0`, means unlimited.
     ///   - selectedPhotosLimit: The max count of photos that can be selected, default is `9`.
     ///   - options: UI options. See `UIOption`
-    ///   - didSelectedAssets: Called after you have selected the photos, output assets.
-    ///   - didSelectedImages: Called after you have selected the photos, output images.
+    ///   - didSelectedPhotos: Called after you have selected the photos.
     public init(actions: [PhotosSheet.Action],
                 displayedPhotosLimit: Int = 0,
                 selectedPhotosLimit: Int = 9,
                 options: Set<UIOption>? = nil,
-                didSelectedAssets: (([PHAsset]) -> ())? = nil,
-                didSelectedImages: (([UIImage]) -> ())? = nil) {
+                didSelectedPhotos: @escaping ([(PHAsset, UIImage)]) -> ()) {
         // SetupUI
         if let options = options {
             PhotosSheet._setupUI(options: options)
         }
         self.actions = actions
         _contentController = ContentController(actions: actions, displayedPhotosLimit: displayedPhotosLimit, selectedPhotosLimit: selectedPhotosLimit)
-        _contentController.didSelectedAssets = didSelectedAssets
-        _contentController.didSelectedImages = didSelectedImages
+        _contentController.didSelectedPhotos = didSelectedPhotos
         super.init(nibName: nil, bundle: nil)
         modalPresentationStyle = .overCurrentContext
         modalTransitionStyle = .crossDissolve
+    }
+
+    /// Init an action sheet with photos on it.
+    ///
+    /// - Parameters:
+    ///   - actions: Actions in action sheet.
+    ///   - displayedPhotosLimit: The max count of photos displayed, default is `0`, means unlimited.
+    ///   - selectedPhotosLimit: The max count of photos that can be selected, default is `9`.
+    ///   - options: UI options. See `UIOption`
+    ///   - didSelectedAssets: Called after you have selected the photos. Output `PHAssets`
+    public convenience init(actions: [PhotosSheet.Action],
+                displayedPhotosLimit: Int = 0,
+                selectedPhotosLimit: Int = 9,
+                options: Set<UIOption>? = nil,
+                didSelectedAssets: @escaping ([PHAsset]) -> ()) {
+        self.init(actions: actions, displayedPhotosLimit: displayedPhotosLimit, selectedPhotosLimit: selectedPhotosLimit, options: options) { didSelectedAssets($0.map { $0.0 }) }
+    }
+
+    /// Init an action sheet with photos on it.
+    ///
+    /// - Parameters:
+    ///   - actions: Actions in action sheet.
+    ///   - displayedPhotosLimit: The max count of photos displayed, default is `0`, means unlimited.
+    ///   - selectedPhotosLimit: The max count of photos that can be selected, default is `9`.
+    ///   - options: UI options. See `UIOption`
+    ///   - didSelectedPhotos: Called after you have selected the photos. Output `UIImage`
+    public convenience init(actions: [PhotosSheet.Action],
+                displayedPhotosLimit: Int = 0,
+                selectedPhotosLimit: Int = 9,
+                options: Set<UIOption>? = nil,
+                didSelectedImages: @escaping ([UIImage]) -> ()) {
+        self.init(actions: actions, displayedPhotosLimit: displayedPhotosLimit, selectedPhotosLimit: selectedPhotosLimit, options: options) { didSelectedImages($0.map { $0.1 }) }
     }
 
     override init(nibName nibNameOrNil: String?, bundle nibBundleOrNil: Bundle?) {
@@ -93,14 +122,36 @@ public final class PhotosSheet: UIViewController {
     }
 
     fileprivate var _contentController: ContentController!
+
+    // Progress View Controller
+    fileprivate lazy var _progressViewController: ProgressViewController = {
+        let viewController = ProgressViewController()
+        viewController.view.alpha = 0
+        return viewController
+    }()
 }
 
 public extension PhotosSheet {
     override func viewDidLoad() {
         super.viewDidLoad()
         view.addSubview(_backgroundView)
+
+        // Handle ContentController callbacks
         _contentController.dismissCallback = { [weak self] in
             self?.dismiss(animated: true, completion: nil)
+        }
+
+        _contentController.showProgressViewControllerCallback = { [weak self] in
+            guard let `self` = self else { return }
+            self.addChildViewController(self._progressViewController)
+            self.view.addSubview(self._progressViewController.view)
+            UIView.animate(withDuration: 0.25, animations: {
+                self._progressViewController.view.alpha = 1
+            })
+        }
+
+        _contentController.progressUpdateCallback = { [weak self] in
+            self?._progressViewController.progress = $0
         }
     }
 
@@ -181,13 +232,17 @@ extension PhotosSheet {
         fileprivate let _normalActionItems: [_ActionItem]
         fileprivate let _cancelActionItems: [_ActionItem]
 
+        var showSendOriginalsButton = false
+
+        // Callback
         var dismissCallback: (() -> ())?
+        var showProgressViewControllerCallback: (() -> ())?
+        var progressUpdateCallback: ((Double) -> ())?
 
-        var didSelectedAssets: (([PHAsset]) -> ())?
-        var didSelectedImages: (([UIImage]) -> ())?
-        var selectedModels: [PhotosProvider.Model] = []
+        fileprivate var _selectedModels: [PhotosProvider.Model] = []
+        var didSelectedPhotos: (([(PHAsset, UIImage)]) -> ())?
 
-        fileprivate let _imagesLoadingQueue = DispatchQueue(label: "PhotosSheet.ContentController.ImagesLoadingQueue")
+        fileprivate var _imagesLoadingWorkItem: DispatchWorkItem?
 
         fileprivate let _displayedPhotosLimit: Int
         fileprivate let _selectedPhotosLimit: Int
@@ -204,6 +259,10 @@ extension PhotosSheet {
             view.autoresizingMask = [.flexibleTopMargin, .flexibleWidth]
         }
 
+        deinit {
+            _imagesLoadingWorkItem?.cancel()
+        }
+
         required init?(coder aDecoder: NSCoder) {
             fatalError("init(coder:) has not been implemented")
         }
@@ -218,8 +277,8 @@ extension PhotosSheet {
             _setupViews()
             _setupGestureRecognizer()
             _photosDisplayController.photosSelected = { [weak self] models in
-                self?._switchToShowSendButton(assetsCount: models.count)
-                self?.selectedModels = models
+                self?._switchToShowSendButton(models: models)
+                self?._selectedModels = models
             }
         }
 
@@ -256,22 +315,26 @@ extension PhotosSheet {
             return view
         }()
 
-        // Fetching Photos from iCloud Alert Controller
-        fileprivate lazy var _fetchingTipAlertController: UIAlertController = {
-            let alertController = UIAlertController(title: "Fetching photos from iCloud"._localizedString, message: nil, preferredStyle: .alert)
-            alertController.addAction(UIAlertAction(title: "Confirm"._localizedString, style: .default, handler: nil))
-            return alertController
-        }()
-
         // Send Photo Button
         fileprivate lazy var _sendPhotoBtn: _ActionItem = {
             let firstItemColor = self._normalActionItems.first?._action.tintColor ?? .green
-            let action = Action(title: "", tintColor: firstItemColor, action: { [weak self] in
+            let action = Action(title: "Send"._localizedString, tintColor: firstItemColor, action: { [weak self] in
                 self?._sendBtnAction()
             })
             let view = _ActionItem(action: action)
             view.isHidden = true
-            view.setTitle("Send"._localizedString, for: .normal)
+            return view
+        }()
+
+        fileprivate lazy var _sendOriginalsBtn: _ActionItem = {
+            let firstItemColor = self._normalActionItems.first?._action.tintColor ?? .green
+            let action = Action(title: "Send Originals"._localizedString, tintColor: firstItemColor, action: { [weak self] in
+                self?._sendBtnAction()
+            })
+            let view = _ActionItem(action: action)
+            view.isHidden = true
+            view.titleLabel?.numberOfLines = 2
+            view.titleLabel?.lineBreakMode = .byWordWrapping
             return view
         }()
 
@@ -283,7 +346,7 @@ extension PhotosSheet {
         // GestureReconizer, Handle Items's Event
         @objc fileprivate func _listenFor(panGestureReconizer: UIPanGestureRecognizer) {
             let location = panGestureReconizer.location(in: view)
-            let items = (_normalActionItems + _cancelActionItems + [_sendPhotoBtn]).filter { !$0.isHidden }
+            let items = (_normalActionItems + _cancelActionItems + [_sendPhotoBtn, _sendOriginalsBtn]).filter { !$0.isHidden }
             switch panGestureReconizer.state {
             case .began, .changed:
                 for actionItem in items {
@@ -353,6 +416,9 @@ fileprivate extension PhotosSheet.ContentController {
         }
         if _normalActionItems.count > 0 {
             _contentViewForNormal.addSubview(_sendPhotoBtn)
+            if showSendOriginalsButton {
+                _contentViewForNormal.addSubview(_sendOriginalsBtn)
+            }
         }
     }
 
@@ -369,12 +435,19 @@ fileprivate extension PhotosSheet.ContentController {
             view.frame = CGRect(x: 0, y: CGFloat(index) * (PhotosSheet.actionSheetItemHeight + 0.5), width: self.view.bounds.width, height: PhotosSheet.actionSheetItemHeight)
         }
 
-        _sendPhotoBtn.frame = CGRect(x: 0, y: _photosDisplayViewHeight, width: view.bounds.width, height: PhotosSheet.actionSheetItemHeight)
+        if showSendOriginalsButton {
+            _sendPhotoBtn.frame = CGRect(x: 0, y: _photosDisplayViewHeight, width: 0.5 * view.bounds.width - 0.25, height: PhotosSheet.actionSheetItemHeight)
+            _sendOriginalsBtn.frame = CGRect(x: 0.5 * view.bounds.width + 0.25, y: _photosDisplayViewHeight, width: 0.5 * view.bounds.width - 0.25, height: PhotosSheet.actionSheetItemHeight)
+        } else {
+            _sendPhotoBtn.frame = CGRect(x: 0, y: _photosDisplayViewHeight, width: view.bounds.width, height: PhotosSheet.actionSheetItemHeight)
+        }
+
     }
 }
 
 fileprivate extension PhotosSheet.ContentController {
-    func _switchToShowSendButton(assetsCount: Int) {
+    func _switchToShowSendButton(models: [PhotosSheet.PhotosProvider.Model]) {
+        let assetsCount = models.count
         let isShow = assetsCount > 0
         // 必须当ActionSheet至少有一个Action的时候才显示发送按钮
         if let firstItem = _normalActionItems.first {
@@ -387,55 +460,60 @@ fileprivate extension PhotosSheet.ContentController {
             }
             let assetsCountString = assetsCount > 1 ? "(\(assetsCount))" : ""
             _sendPhotoBtn.setTitle("Send"._localizedString + assetsCountString, for: .normal)
+            _calcTotalSizeAndDisplayOnSendOriginalsBtn()
+        }
+    }
+
+    func _calcTotalSizeAndDisplayOnSendOriginalsBtn() {
+        _selectedModels.forEach { model in
+            model.calcSizeCompletedCallback = { [weak self] in
+                let size = self?._selectedModels.reduce(0) { p, n in n.size + p }
+                let bcf = ByteCountFormatter()
+                bcf.allowedUnits = [.useMB]
+                bcf.countStyle = .file
+                let sizeString = size == nil ? "" : "(" + bcf.string(fromByteCount: Int64(size!)) + ")"
+                self?._sendOriginalsBtn.setTitle("Send Originals"._localizedString + "\n" + sizeString, for: .normal)
+            }
         }
     }
 
     func _sendBtnAction() {
-        guard self._checkCanSendPhoto() else {
-            // Show Fecting tip Alert Controller
-            present(_fetchingTipAlertController, animated: true, completion: nil)
-            _waitingForDownloadThenSend()
-            return
+        showProgressViewControllerCallback?()
+        _setupProgressListening()
+        _fetchAllPhotos { [weak self] photos in
+            self?.progressUpdateCallback?(1)
+            self?._sendPhotosAction(photos: photos)
         }
-        _sendPhotosAction()
     }
 
-    func _waitingForDownloadThenSend() {
-        for model in selectedModels {
-            model.downloadCompletedCallback = { [weak self] in
-                guard let `self` = self else { return }
-                if self._checkCanSendPhoto() {
-                    self.selectedModels.forEach { $0.downloadCompletedCallback = nil }
-                    self._fetchingTipAlertController.dismiss(animated: true, completion: nil)
-                    self._sendPhotosAction()
-                }
+    func _setupProgressListening() {
+        var progressMap: [PhotosSheet.PhotosProvider.Model: Double] = _selectedModels.reduce([:]) {
+            var p = $0; p[$1] = 0; return p
+        }
+        _selectedModels.forEach { model in
+            model.downloadProgressCallback = { [weak self] in
+                progressMap[model] = $0
+                let totalProgress: Double = progressMap.reduce(0) { $0 + $1.value } / Double(progressMap.count)
+                // Update Progress
+                self?.progressUpdateCallback?(max(0.15, totalProgress))
             }
         }
     }
 
-    func _sendPhotosAction() {
-        let assets = selectedModels.map { $0.asset }
-        didSelectedAssets?(assets)
-        if let didSelectedImages = didSelectedImages {
-            assets.fetchImages(on: _imagesLoadingQueue, completionHandle: { [weak self] in
-                didSelectedImages($0)
-                self?._dismiss()
-            })
-        } else {
-            _dismiss()
-        }
-    }
-
-    // Check
-    func _checkCanSendPhoto() -> Bool {
-        var isOK = true
-        for model in selectedModels {
-            if !model.isDownloadCompleted {
-                isOK = false
-                break
+    func _fetchAllPhotos(completionHandler: @escaping ([(PHAsset, UIImage)]) -> ()) {
+        let workItem = DispatchWorkItem { [weak self] in
+            let photos = self?._selectedModels.flatMap { $0.fetchAssetFromLocalOrCloud() } ?? []
+            DispatchQueue.main.async {
+                completionHandler(photos)
             }
         }
-        return isOK
+        DispatchQueue.global().async(execute: workItem)
+        _imagesLoadingWorkItem = workItem
+    }
+
+    func _sendPhotosAction(photos: [(PHAsset, UIImage)]) {
+        didSelectedPhotos?(photos)
+        _dismiss()
     }
 }
 
@@ -553,7 +631,6 @@ extension PhotosSheet {
             backgroundColor = UIColor.clear
             contentView.addSubview(mContentView)
             contentView.addSubview(checkbox)
-            contentView.addSubview(progressView)
         }
 
         required init?(coder aDecoder: NSCoder) {
@@ -571,25 +648,12 @@ extension PhotosSheet {
                 _setupCheckbox(isModelSelected: model.didSelected)
                 model.didChangedSelected = { [weak self] didSelected in
                     self?._setupCheckbox(isModelSelected: didSelected)
-                    if didSelected { self?.model?.downloadAssetFromCloud() }
+                    // TODO: 在WIFI环境下当用户选择照片后进行预下载
+                    // 但是在普通环境下用户要先点击发送按钮才进行下载
+//                    if didSelected { self?.model?.fetchAssetFromLocalOrCloud() }
                 }
-                _listenAssetDownloadProgress()
                 checkbox.isHidden = !model.didSelected && _hideCheckbox
             }
-        }
-
-        // 针对从ICloud下载原图
-        fileprivate func _listenAssetDownloadProgress() {
-            model?.downloadProgressCallback = { [weak self] downloadProgress in
-                self?.progressView.progress = downloadProgress
-                self?.progressView.isHidden = downloadProgress >= 1
-            }
-        }
-
-        fileprivate func _cancelListenAssetDownloadProgress() {
-            model?.downloadProgressCallback = nil
-            progressView.progress = 0
-            progressView.isHidden = false
         }
 
         fileprivate func _setupCheckbox(isModelSelected: Bool) {
@@ -602,7 +666,6 @@ extension PhotosSheet {
             if let preRequestId = _preRequestId {
                 PHImageManager.default().cancelImageRequest(preRequestId)
             }
-            _cancelListenAssetDownloadProgress()
         }
 
         deinit {
@@ -616,7 +679,6 @@ extension PhotosSheet {
             mContentView.frame = bounds
             checkbox.sizeToFit()
             checkbox.frame.origin = CGPoint(x: bounds.width - checkbox.bounds.width - PhotosSheet.photoItemCheckboxRightMargin, y: bounds.height - checkbox.bounds.height - PhotosSheet.photoItemCheckboxBottomMargin)
-            progressView.center = CGPoint(x: 0.5 * bounds.width, y: 0.5 * bounds.height)
         }
 
         lazy private(set) var mContentView: UIImageView = {
@@ -630,65 +692,6 @@ extension PhotosSheet {
             let view = UIImageView()
             view.image = UIImage(named: "selection-mark-normal", in: Bundle._myBundle, compatibleWith: nil)
             return view
-        }()
-
-        lazy private(set) var progressView: DownloadProgressView = {
-            let size = CGSize(width: 40, height: 40)
-            return DownloadProgressView(frame: CGRect(origin: .zero, size: size), lineWidth: 4)
-        }()
-    }
-}
-
-// MARK: - DownloadProgressView
-extension PhotosSheet {
-    final class DownloadProgressView: UIView {
-        fileprivate let _lineWidth: CGFloat
-
-        init(frame: CGRect, lineWidth: CGFloat) {
-            _lineWidth = lineWidth
-            super.init(frame: frame)
-            backgroundColor = .clear
-            layer.shadowColor = UIColor.black.cgColor
-            layer.shadowRadius = 2
-            layer.shadowOpacity = 0.2
-            layer.shadowOffset = CGSize(width: 1, height: 1)
-        }
-
-        required init?(coder aDecoder: NSCoder) {
-            fatalError("init(coder:) has not been implemented")
-        }
-
-        override func layoutSubviews() {
-            super.layoutSubviews()
-            layer.addSublayer(_circle)
-        }
-
-        var progress: Double = 0 {
-            didSet {
-                _circle.strokeEnd = CGFloat(self.progress)
-            }
-        }
-
-        fileprivate lazy var _circlePath: UIBezierPath = {
-            return UIBezierPath(arcCenter: CGPoint(x: 0.5 * self.bounds.size.width, y: 0.5 * self.bounds.size.height),
-                                radius: 0.5 * (self.bounds.size.width - 2 * self._lineWidth),
-                                startAngle: -0.5 * CGFloat.pi,
-                                endAngle: 2 * CGFloat.pi - 0.5 * CGFloat.pi,
-                                clockwise: true)
-        }()
-
-        fileprivate lazy var _circle: CAShapeLayer = {
-            let circle = CAShapeLayer()
-            circle.frame = self.layer.bounds
-            circle.path = self._circlePath.cgPath
-            circle.lineCap = kCALineCapRound
-            circle.fillColor = UIColor.clear.cgColor
-            circle.strokeColor = UIColor.white.cgColor
-            circle.strokeStart = 0
-            circle.strokeEnd = 0
-            circle.zPosition = 1
-            circle.lineWidth = self._lineWidth
-            return circle
         }()
     }
 }
@@ -753,8 +756,10 @@ fileprivate extension PhotosSheet.PhotosProvider {
 extension PhotosSheet.PhotosProvider {
     class Model {
         let asset: PHAsset
-        fileprivate(set) var isDownloadCompleted: Bool = false
-        fileprivate(set) var downloadTask: PHImageRequestID?
+        fileprivate(set) var size: Int = 0
+        fileprivate let _semaphore = DispatchSemaphore(value: 1)
+        fileprivate var _downloadTask: PHImageRequestID?
+
         var didSelected: Bool = false {
             didSet {
                 didChangedSelected?(didSelected)
@@ -763,14 +768,14 @@ extension PhotosSheet.PhotosProvider {
 
         var didChangedSelected: ((Bool) -> ())?
         var downloadProgressCallback: ((Double) -> ())?
-        var downloadCompletedCallback: (() -> ())?
+        var calcSizeCompletedCallback: (() -> ())?
 
         init(asset: PHAsset) {
             self.asset = asset
         }
 
         deinit {
-            cancelDownload()
+            cancel()
         }
     }
 }
@@ -786,18 +791,28 @@ extension PhotosSheet.PhotosProvider.Model: Hashable {
 }
 
 extension PhotosSheet.PhotosProvider.Model {
-    func downloadAssetFromCloud() {
-        guard downloadTask == nil else { return }
-        downloadTask = PhotosSheet.PhotosManager.shared.fetchPhoto(with: asset, type: .original, progressHandler: { [weak self] progress, _ in
+    // !!Synchronous!! Do not call in main thread
+    func fetchAssetFromLocalOrCloud() -> (PHAsset, UIImage)? {
+        _semaphore.wait()
+        defer {
+            _semaphore.signal()
+        }
+        guard _downloadTask == nil else { return nil }
+        var ret: (PHAsset, UIImage)? = nil
+        _downloadTask = PhotosSheet.PhotosManager.shared.fetchPhoto(with: asset, type: .original, isSynchronous: true, progressHandler: { [weak self] progress, _ in
             DispatchQueue.main.async {
                 self?.downloadProgressCallback?(progress)
             }
-        }) { [weak self] _ in self?.isDownloadCompleted = true; self?.downloadCompletedCallback?() }
+        }) { [weak self] image in
+            guard let `self` = self else { return }
+            ret = (self.asset, image)
+        }
+        return ret
     }
 
-    func cancelDownload() {
-        if let downloadTask = downloadTask {
-            PHImageManager.default().cancelImageRequest(downloadTask)
+    func cancel() {
+        if let task = _downloadTask {
+            PHImageManager.default().cancelImageRequest(task)
         }
     }
 }
@@ -899,6 +914,7 @@ extension PhotosSheet.PhotosManager {
             targetSize = PHImageManagerMaximumSize
         }
 
+        // resultHandler called in main thread
         if asset.representsBurst {
             return PHImageManager.default().requestImageData(for: asset, options: option, resultHandler: { data, _, _, info in
                 guard let info = info else { return }
@@ -996,22 +1012,6 @@ fileprivate extension UIImage {
             return retImage
         } else {
             return self
-        }
-    }
-}
-
-fileprivate extension Array where Element == PHAsset {
-    func fetchImages(on queue: DispatchQueue, completionHandle: @escaping ([UIImage]) -> ()) {
-        queue.async {
-            var images: [UIImage] = []
-            self.forEach { asset in
-                PhotosSheet.PhotosManager.shared.fetchPhoto(with: asset, type: .original, isSynchronous: true, completion: { image in
-                    images.append(image)
-                })
-            }
-            DispatchQueue.main.async {
-                completionHandle(images)
-            }
         }
     }
 }

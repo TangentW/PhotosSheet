@@ -7,12 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		BA7DF81A1F41A0BD00D5245A /* ProgressViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA7DF8191F41A0BD00D5245A /* ProgressViewController.swift */; };
 		BAE74ECC1F3F7C62000C9814 /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BAE74ECB1F3F7C62000C9814 /* Images.xcassets */; };
 		BAE74ECE1F3F7C6F000C9814 /* PhotosSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAE74ECD1F3F7C6F000C9814 /* PhotosSheet.swift */; };
 		BAE74F001F401E5C000C9814 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = BAE74F021F401E5C000C9814 /* Localizable.strings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		BA7DF8191F41A0BD00D5245A /* ProgressViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressViewController.swift; sourceTree = "<group>"; };
 		BAE74EC01F3F7C4E000C9814 /* PhotosSheet.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = PhotosSheet.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		BAE74EC41F3F7C4E000C9814 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		BAE74ECB1F3F7C62000C9814 /* Images.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Images.xcassets; sourceTree = "<group>"; };
@@ -54,6 +56,7 @@
 				BAE74EC41F3F7C4E000C9814 /* Info.plist */,
 				BAE74ECB1F3F7C62000C9814 /* Images.xcassets */,
 				BAE74ECD1F3F7C6F000C9814 /* PhotosSheet.swift */,
+				BA7DF8191F41A0BD00D5245A /* ProgressViewController.swift */,
 				BAE74F021F401E5C000C9814 /* Localizable.strings */,
 			);
 			path = PhotosSheet;
@@ -142,6 +145,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				BAE74ECE1F3F7C6F000C9814 /* PhotosSheet.swift in Sources */,
+				BA7DF81A1F41A0BD00D5245A /* ProgressViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -325,6 +329,7 @@
 				BAE74ECA1F3F7C4E000C9814 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
 	};
