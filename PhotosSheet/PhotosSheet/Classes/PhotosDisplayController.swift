@@ -47,14 +47,6 @@ extension PhotosSheet.PhotosDisplayController {
         view.addSubview(photosDisplayView)
     }
 
-    override func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
-        // 放在下一个Runloop周期，对所有显示出来的CollectionViewCell中的Checkbox进行布局
-        DispatchQueue.main.async {
-            self.photosDisplayView.delegate?.scrollViewDidScroll?(self.photosDisplayView)
-        }
-    }
-
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         photosDisplayView.frame = view.bounds
@@ -73,15 +65,16 @@ extension PhotosSheet.PhotosDisplayController {
                 if let model = self?.model, model.didSelected {
                     return
                 }
-                self?.checkbox.isHidden = hide
+                self?._checkbox.isHidden = hide
             }
         }()
 
         override init(frame: CGRect) {
             super.init(frame: frame)
             backgroundColor = UIColor.clear
-            contentView.addSubview(mContentView)
-            contentView.addSubview(checkbox)
+            contentView.addSubview(_contentView)
+            contentView.addSubview(_checkbox)
+            contentView.addSubview(_videoMarkView)
         }
 
         required init?(coder aDecoder: NSCoder) {
@@ -91,25 +84,27 @@ extension PhotosSheet.PhotosDisplayController {
         var model: PhotosSheet.Model? {
             didSet {
                 guard let model = model, oldValue != model else { return }
-                // 加载缩略图
-                _preRequestId = PhotosSheet.PhotosManager.shared.fetchPhoto(with: model.asset, type: .thumbnail(height: PhotosSheet.photoItemHeight), completion: { [weak self] image in
-                    // 会走两次，第一次是获取本地质量略差的缩略图，第二次是获取Cloud质量不错的缩略图
-                    self?.mContentView.image = image
+                // Loading thumbnail
+                _preRequestId = PhotosSheet.PhotosManager.shared.fetchPhoto(with: model.asset, type: .thumbnail(height: PhotosSheet.photoItemHeight), completionHandler: { [weak self] image in
+                    // Called twice.
+                    // First callback low quality thumbnail, second callback high quality thumbnail.
+                    self?._contentView.image = image
                 })
                 _setupCheckbox(isModelSelected: model.didSelected)
+                _videoMarkView.isHidden = model.asset.mediaType != .video
                 model.didChangedSelected = { [weak self] didSelected in
                     self?._setupCheckbox(isModelSelected: didSelected)
                     // TODO: 在WIFI环境下当用户选择照片后进行预下载
                     // 但是在普通环境下用户要先点击发送按钮才进行下载
                     // if didSelected { self?.model?.fetchAssetFromLocalOrCloud() }
                 }
-                checkbox.isHidden = !model.didSelected && _hideCheckbox
+                _checkbox.isHidden = !model.didSelected && _hideCheckbox
             }
         }
 
         fileprivate func _setupCheckbox(isModelSelected: Bool) {
             let checkboxImage = isModelSelected ? UIImage(named: "selection-mark-selected", in: Bundle.myBundle, compatibleWith: nil) : UIImage(named: "selection-mark-normal", in: Bundle.myBundle, compatibleWith: nil)
-            checkbox.image = checkboxImage
+            _checkbox.image = checkboxImage
         }
 
         override func prepareForReuse() {
@@ -127,21 +122,34 @@ extension PhotosSheet.PhotosDisplayController {
 
         override func layoutSubviews() {
             super.layoutSubviews()
-            mContentView.frame = bounds
-            checkbox.sizeToFit()
-            checkbox.frame.origin = CGPoint(x: bounds.width - checkbox.bounds.width - PhotosSheet.photoItemCheckboxRightMargin, y: bounds.height - checkbox.bounds.height - PhotosSheet.photoItemCheckboxBottomMargin)
+            _contentView.frame = bounds
+            _checkbox.sizeToFit()
+            _checkbox.frame.origin = CGPoint(x: bounds.width - _checkbox.bounds.width - PhotosSheet.photoItemCheckboxRightMargin, y: bounds.height - _checkbox.bounds.height - PhotosSheet.photoItemCheckboxBottomMargin)
+            _videoMarkView.sizeToFit()
+            _videoMarkView.frame.origin = CGPoint(x: PhotosSheet.photoItemVideoMarkerViewLeftMargin, y: bounds.height - _videoMarkView.bounds.height - PhotosSheet.photoItemVideoMarkerViewBottomMargin)
         }
 
-        lazy private(set) var mContentView: UIImageView = {
+        fileprivate lazy var _contentView: UIImageView = {
             let imageView = UIImageView()
             imageView.contentMode = .scaleAspectFill
             imageView.layer.masksToBounds = true
             return imageView
         }()
 
-        lazy private(set) var checkbox: UIImageView = {
+        fileprivate lazy var _checkbox: UIImageView = {
             let view = UIImageView()
             view.image = UIImage(named: "selection-mark-normal", in: Bundle.myBundle, compatibleWith: nil)
+            return view
+        }()
+
+        fileprivate lazy var _videoMarkView: UIImageView = {
+            let view = UIImageView()
+            view.tintColor = .white
+            view.image = UIImage(named: "file-cate-list-video", in: Bundle.myBundle, compatibleWith: nil)?.withRenderingMode(.alwaysTemplate)
+            view.layer.shadowColor = UIColor.black.cgColor
+            view.layer.shadowOffset = CGSize(width: 1, height: 1)
+            view.layer.shadowRadius = 1
+            view.layer.shadowOpacity = 0.7
             return view
         }()
     }
@@ -150,7 +158,7 @@ extension PhotosSheet.PhotosDisplayController {
 extension PhotosSheet.PhotosDisplayController.PhotoItemView: PhotosDisplayViewContentOffsetObserver {
     func displayView(_ displayView: UICollectionView, onContentOffsetChange contentOffset: CGPoint) {
         let displayViewWidth = displayView.bounds.width
-        let x = min(max(displayViewWidth - (frame.origin.x - contentOffset.x) - checkbox.bounds.width - PhotosSheet.photoItemCheckboxRightMargin, PhotosSheet.photoItemCheckboxRightMargin), bounds.width - checkbox.bounds.width - PhotosSheet.photoItemCheckboxBottomMargin)
-        checkbox.frame.origin.x = x
+        let x = min(max(displayViewWidth - (frame.origin.x - contentOffset.x) - _checkbox.bounds.width - PhotosSheet.photoItemCheckboxRightMargin, PhotosSheet.photoItemCheckboxRightMargin), bounds.width - _checkbox.bounds.width - PhotosSheet.photoItemCheckboxBottomMargin)
+        _checkbox.frame.origin.x = x
     }
 }

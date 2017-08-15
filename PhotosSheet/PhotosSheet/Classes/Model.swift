@@ -52,8 +52,9 @@ extension PhotosSheet.Model {
         defer {
             _semaphore.signal()
         }
-        guard _downloadTask == nil else { return nil }
+        _cancelTask()
         var ret: (PHAsset, UIImage)? = nil
+        // If asset type is video, fetch first frame image
         _downloadTask = PhotosSheet.PhotosManager.shared.fetchPhoto(with: asset, type: .original, isSynchronous: true, progressHandler: { [weak self] progress, _ in
             DispatchQueue.main.async {
                 self?.downloadProgressCallback?(progress)
@@ -65,6 +66,31 @@ extension PhotosSheet.Model {
         return ret
     }
 
+    // !!Synchronous!! Do not call in main thread
+    func fetchVideoFromLocalOrCloud() -> (PHAsset, AVAsset)? {
+        _semaphore.wait()
+        defer {
+            _semaphore.signal()
+        }
+        _cancelTask()
+        var ret: (PHAsset, AVAsset)? = nil
+        // If mediaType not is video, callback nil.
+        guard asset.mediaType == .video else { return ret }
+        let group = DispatchGroup()
+        group.enter()
+        _downloadTask = PhotosSheet.PhotosManager.shared.fetchVideo(with: asset, progressHandler: { [weak self] progress, _ in
+            DispatchQueue.main.async {
+                self?.downloadProgressCallback?(progress)
+            }
+        }) { [weak self] avAsset in
+            guard let `self` = self else { return }
+            ret = (self.asset, avAsset)
+            group.leave()
+        }
+        group.wait()
+        return ret
+    }
+
     func _cancelTask() {
         if let task = _downloadTask {
             PHImageManager.default().cancelImageRequest(task)
@@ -72,13 +98,18 @@ extension PhotosSheet.Model {
     }
 }
 
+// Fetch photos from models
 extension Array where Element == PhotosSheet.Model {
-    func fetchPhotos(completionHandler: @escaping ([(PHAsset, UIImage)]) -> ()) -> DispatchWorkItem {
+    func fetchVideosAndPhotos(completionHandler: @escaping ([(PHAsset, UIImage, AVAsset?)]) ->()) -> DispatchWorkItem {
         let workItem = DispatchWorkItem {
-            let photos = self.flatMap { $0.fetchPhotoFromLocalOrCloud() }
-            DispatchQueue.main.async {
-                completionHandler(photos)
+            let videosAndPhotos: [(PHAsset, UIImage, AVAsset?)] = self.flatMap {
+                let video = $0.fetchVideoFromLocalOrCloud()
+                guard let photo = $0.fetchPhotoFromLocalOrCloud() else { return nil }
+                return (photo.0, photo.1, video?.1)
             }
+            DispatchQueue.main.async(execute: {
+                completionHandler(videosAndPhotos)
+            })
         }
         DispatchQueue.global().async(execute: workItem)
         return workItem

@@ -16,14 +16,21 @@ extension PhotosSheet {
     }
 }
 
+// For Photos
 extension PhotosSheet.PhotosManager {
-    // ResultImage, Info, IsDegraded
-    typealias ImageRequestCompletion = (UIImage) -> ()
+    // ResultImage
+    typealias ImageRequestCompletionHandler = (UIImage) -> ()
     // Progress, Stop
-    typealias ImageDownloadProgressHandler = (Double, UnsafeMutablePointer<ObjCBool>) -> ()
+    typealias DownloadProgressHandler = (Double, UnsafeMutablePointer<ObjCBool>) -> ()
+    // videoAsset
+    typealias VideoRequestCompletionHandler = (AVAsset) -> ()
 
     @discardableResult
-    func fetchPhoto(with asset: PHAsset, type: PhotoFetchType, isSynchronous: Bool = false, progressHandler: ImageDownloadProgressHandler? = nil, completion: @escaping ImageRequestCompletion) -> PHImageRequestID {
+    func fetchPhoto(with asset: PHAsset,
+                    type: PhotoFetchType,
+                    isSynchronous: Bool = false,
+                    progressHandler: DownloadProgressHandler? = nil, // Called not in main thread!
+                    completionHandler: @escaping ImageRequestCompletionHandler) -> PHImageRequestID {
         let option = PHImageRequestOptions()
         option.isSynchronous = isSynchronous
         option.progressHandler = { progress, _, stop, _ in
@@ -44,7 +51,6 @@ extension PhotosSheet.PhotosManager {
             targetSize = PHImageManagerMaximumSize
         }
 
-        // resultHandler called in main thread
         if asset.representsBurst {
             return PHImageManager.default().requestImageData(for: asset, options: option, resultHandler: { data, _, _, info in
                 guard let info = info else { return }
@@ -52,10 +58,10 @@ extension PhotosSheet.PhotosManager {
                 guard let data = data, let image = UIImage(data: data), fetchSucceed else { return }
                 if targetSize != PHImageManagerMaximumSize {
                     if let retImage = image.scaleTo(size: targetSize) {
-                        completion(retImage)
+                        completionHandler(retImage)
                     }
                 } else {
-                    completion(image)
+                    completionHandler(image)
                 }
             })
         } else {
@@ -63,9 +69,29 @@ extension PhotosSheet.PhotosManager {
                 guard let info = info else { return }
                 let fetchSucceed = !(info[PHImageCancelledKey] as? Bool ?? false) && info[PHImageErrorKey] == nil
                 guard let image = image, fetchSucceed else { return }
-                completion(image)
+                completionHandler(image)
             })
         }
+    }
+}
+
+// For Video
+extension PhotosSheet.PhotosManager {
+    @discardableResult
+    func fetchVideo(with asset: PHAsset, // Media type must be video, This function do not judge.
+                    progressHandler: DownloadProgressHandler?,
+                    completionHandler: @escaping VideoRequestCompletionHandler) -> PHImageRequestID? {
+        let option = PHVideoRequestOptions()
+        option.deliveryMode = .highQualityFormat
+        option.isNetworkAccessAllowed = true
+        option.progressHandler = { progress, _, stop, _ in
+            progressHandler?(progress, stop)
+        }
+        return PHImageManager.default().requestAVAsset(forVideo: asset, options: option, resultHandler: { avAsset, _, _ in
+            if let avAsset = avAsset {
+                completionHandler(avAsset)
+            }
+        })
     }
 }
 
@@ -77,11 +103,11 @@ extension PhotosSheet.PhotosManager {
 }
 
 extension PhotosSheet.PhotosManager {
-    func obtainRecentAssets(limit: Int = 0) -> [PHAsset] {
+    func obtainRecentAssets(mediaOption: PhotosSheet.MediaOption = .all, limit: Int = 0) -> [PHAsset] {
         let fetchOption = PHFetchOptions()
-        fetchOption.includeAssetSourceTypes = [.typeUserLibrary]
-        // TODO: Support more media type
-        fetchOption.predicate = NSPredicate(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
+        if let predicate = NSPredicate(mediaOption: mediaOption) {
+            fetchOption.predicate = predicate
+        }
         let sortDescriptor = NSSortDescriptor(key: "creationDate", ascending: false)
         fetchOption.sortDescriptors = [sortDescriptor]
         if limit > 0 {
@@ -89,5 +115,20 @@ extension PhotosSheet.PhotosManager {
         }
         let results = PHAsset.fetchAssets(with: fetchOption)
         return results.objects(at: IndexSet(0 ..< results.count))
+    }
+}
+
+fileprivate extension NSPredicate {
+    convenience init?(mediaOption: PhotosSheet.MediaOption) {
+        switch mediaOption {
+        case .photo:
+            self.init(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
+        case .video:
+            self.init(format: "mediaType == %d", PHAssetMediaType.video.rawValue)
+        case .all:
+            self.init(format: "mediaType == %d || mediaType == %d", PHAssetMediaType.image.rawValue, PHAssetMediaType.video.rawValue)
+        default:
+            return nil
+        }
     }
 }

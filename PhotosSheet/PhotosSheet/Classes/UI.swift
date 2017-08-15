@@ -12,6 +12,8 @@ public extension PhotosSheet {
     enum UIOption: Hashable {
         case photoItemCheckboxRightMargin(CGFloat)
         case photoItemCheckboxBottomMargin(CGFloat)
+        case photoItemVideoMarkerViewLeftMargin(CGFloat)
+        case photoItemVideoMarkerViewBottomMargin(CGFloat)
         case photoItemHeight(CGFloat)
         case actionSheetFont(UIFont)
         case actionSheetCorners(CGFloat)
@@ -23,12 +25,14 @@ public extension PhotosSheet {
             switch self {
             case .photoItemCheckboxRightMargin : return 0
             case .photoItemCheckboxBottomMargin : return 1
-            case .photoItemHeight : return 2
-            case .actionSheetFont : return 3
-            case .actionSheetCorners : return 4
-            case .actionSheetHorizontalMargin : return 5
-            case .actionSheetVerticalMargin : return 6
-            case .actionSheetItemHeight : return 7
+            case .photoItemVideoMarkerViewLeftMargin: return 2
+            case .photoItemVideoMarkerViewBottomMargin: return 3
+            case .photoItemHeight : return 4
+            case .actionSheetFont : return 5
+            case .actionSheetCorners : return 6
+            case .actionSheetHorizontalMargin : return 7
+            case .actionSheetVerticalMargin : return 8
+            case .actionSheetItemHeight : return 9
             }
         }
 
@@ -42,6 +46,8 @@ public extension PhotosSheet {
 extension PhotosSheet {
     fileprivate(set) static var photoItemCheckboxRightMargin: CGFloat = 5
     fileprivate(set) static var photoItemCheckboxBottomMargin: CGFloat = 5
+    fileprivate(set) static var photoItemVideoMarkerViewLeftMargin: CGFloat = 7
+    fileprivate(set) static var photoItemVideoMarkerViewBottomMargin: CGFloat = 7
     fileprivate(set) static var photoItemHeight: CGFloat = (UIScreen.main.bounds.width - 2 * PhotosSheet.actionSheetHorizontalMargin) * 0.7
     fileprivate(set) static var actionSheetFont = UIFont.systemFont(ofSize: 20)
     fileprivate(set) static var actionSheetCorners: CGFloat = 12
@@ -58,6 +64,10 @@ extension PhotosSheet {
                 photoItemCheckboxRightMargin = value
             case .photoItemCheckboxBottomMargin(let value):
                 photoItemCheckboxBottomMargin = value
+            case .photoItemVideoMarkerViewLeftMargin(let value):
+                photoItemVideoMarkerViewLeftMargin = value
+            case .photoItemVideoMarkerViewBottomMargin(let value):
+                photoItemVideoMarkerViewBottomMargin = value
             case .photoItemHeight(let value):
                 photoItemHeight = value
             case .actionSheetFont(let value):

@@ -11,6 +11,7 @@ import Photos
 // MARK: - ContentController
 extension PhotosSheet {
     final class ContentController: UIViewController {
+        fileprivate let _mediaOption: MediaOption
         fileprivate let _normalActionItems: [ActionItem]
         fileprivate let _cancelActionItems: [ActionItem]
 
@@ -22,7 +23,7 @@ extension PhotosSheet {
         var progressUpdateCallback: ((Double) -> ())?
 
         fileprivate var _selectedModels: [Model] = []
-        var didSelectedPhotos: (([(PHAsset, UIImage)]) -> ())?
+        var didSelectedPhotos: (([(PHAsset, UIImage, AVAsset?)]) -> ())?
 
         // WorkItem For Fetching Photos
         fileprivate var _photosFetchingWorkItem: DispatchWorkItem?
@@ -33,7 +34,8 @@ extension PhotosSheet {
         fileprivate var _photosDisplayViewHeight: CGFloat = UIApplication.shared.statusBarOrientation == .portrait
             ? PhotosSheet.photoItemHeight : 0
 
-        init(actions: [Action], displayedPhotosLimit: Int, selectedPhotosLimit: Int) {
+        init(mediaOption: MediaOption, actions: [Action], displayedPhotosLimit: Int, selectedPhotosLimit: Int) {
+            _mediaOption = mediaOption
             _displayedPhotosLimit = displayedPhotosLimit
             _selectedPhotosLimit = selectedPhotosLimit
             _normalActionItems = actions.filter { $0.style == .normal }.map(ActionItem.init)
@@ -102,7 +104,7 @@ extension PhotosSheet {
         fileprivate lazy var _sendPhotoBtn: ActionItem = {
             let firstItemColor = self._normalActionItems.first?._action.tintColor ?? .green
             let action = Action(title: "Send".localizedString, tintColor: firstItemColor, action: { [weak self] in
-                self?._sendPhotosAction()
+                self?._sendBtnAction()
             })
             let view = ActionItem(action: action)
             view.isHidden = true
@@ -112,7 +114,7 @@ extension PhotosSheet {
         fileprivate lazy var _sendOriginalsBtn: ActionItem = {
             let firstItemColor = self._normalActionItems.first?._action.tintColor ?? .green
             let action = Action(title: "Send Originals".localizedString, tintColor: firstItemColor, action: { [weak self] in
-                self?._sendPhotosAction()
+                self?._sendBtnAction()
             })
             let view = ActionItem(action: action)
             view.isHidden = true
@@ -128,7 +130,7 @@ extension PhotosSheet {
 
         // PhotosProvider
         fileprivate lazy var _photosProvider: PhotosProvider = {
-            return PhotosProvider(collectionView: self._photosDisplayController.photosDisplayView, displayedPhotosLimit: self._displayedPhotosLimit, selectedPhotosLimit: self._selectedPhotosLimit)
+            return PhotosProvider(collectionView: self._photosDisplayController.photosDisplayView, mediaOption: self._mediaOption, displayedPhotosLimit: self._displayedPhotosLimit, selectedPhotosLimit: self._selectedPhotosLimit)
         }()
 
         // GestureReconizer, Handle Items's Event
@@ -265,15 +267,19 @@ fileprivate extension PhotosSheet.ContentController {
         }
     }
 
-    func _sendPhotosAction() {
+    func _sendBtnAction() {
         showProgressViewControllerCallback?()
         _setupProgressListening()
-        _photosFetchingWorkItem = _selectedModels.fetchPhotos(completionHandler: { [weak self] photos in
-            // Send Photos
-            self?.progressUpdateCallback?(1)
-            self?.didSelectedPhotos?(photos)
-            self?._dismiss()
-        })
+        _photosFetchingWorkItem = _selectedModels.fetchVideosAndPhotos { [weak self] in
+            self?._sendPhotosAction($0)
+        }
+    }
+
+    func _sendPhotosAction(_ photos: [(PHAsset, UIImage, AVAsset?)]) {
+        // Send Photos
+        progressUpdateCallback?(1)
+        didSelectedPhotos?(photos)
+        _dismiss()
     }
 
     func _setupProgressListening() {

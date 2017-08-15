@@ -17,21 +17,26 @@ public final class PhotosSheet: UIViewController {
     ///
     /// - Parameters:
     ///   - actions: Actions in action sheet.
+    ///   - mediaOption: The media option of the asset you want to select.
     ///   - displayedPhotosLimit: The max count of photos displayed, default is `0`, means unlimited.
     ///   - selectedPhotosLimit: The max count of photos that can be selected, default is `9`.
     ///   - options: UI options. See `UIOption`
     ///   - didSelectedPhotos: Called after you have selected the photos.
     public init(actions: [PhotosSheet.Action],
+                mediaOption: MediaOption = .all,
                 displayedPhotosLimit: Int = 0,
                 selectedPhotosLimit: Int = 9,
                 options: Set<UIOption>? = nil,
-                didSelectedPhotos: @escaping ([(PHAsset, UIImage)]) -> ()) {
+                didSelectedPhotos: @escaping ([(PHAsset, UIImage, AVAsset?)]) -> ()) {
         // SetupUI
         if let options = options {
             PhotosSheet.setupUI(options: options)
         }
         self.actions = actions
-        _contentController = ContentController(actions: actions, displayedPhotosLimit: displayedPhotosLimit, selectedPhotosLimit: selectedPhotosLimit)
+        _contentController = ContentController(mediaOption: mediaOption,
+                                               actions: actions,
+                                               displayedPhotosLimit: displayedPhotosLimit,
+                                               selectedPhotosLimit: selectedPhotosLimit)
         _contentController.didSelectedPhotos = didSelectedPhotos
         super.init(nibName: nil, bundle: nil)
         modalPresentationStyle = .overCurrentContext
@@ -42,32 +47,36 @@ public final class PhotosSheet: UIViewController {
     ///
     /// - Parameters:
     ///   - actions: Actions in action sheet.
+    ///   - mediaOption: The media option of the asset you want to select.
     ///   - displayedPhotosLimit: The max count of photos displayed, default is `0`, means unlimited.
     ///   - selectedPhotosLimit: The max count of photos that can be selected, default is `9`.
     ///   - options: UI options. See `UIOption`
     ///   - didSelectedAssets: Called after you have selected the photos. Output `PHAssets`
     public convenience init(actions: [PhotosSheet.Action],
-                displayedPhotosLimit: Int = 0,
-                selectedPhotosLimit: Int = 9,
-                options: Set<UIOption>? = nil,
-                didSelectedAssets: @escaping ([PHAsset]) -> ()) {
-        self.init(actions: actions, displayedPhotosLimit: displayedPhotosLimit, selectedPhotosLimit: selectedPhotosLimit, options: options) { didSelectedAssets($0.map { $0.0 }) }
+                            mediaOption: MediaOption = .all,
+                            displayedPhotosLimit: Int = 0,
+                            selectedPhotosLimit: Int = 9,
+                            options: Set<UIOption>? = nil,
+                            didSelectedAssets: @escaping ([PHAsset]) -> ()) {
+        self.init(actions: actions, mediaOption: mediaOption, displayedPhotosLimit: displayedPhotosLimit, selectedPhotosLimit: selectedPhotosLimit, options: options) { didSelectedAssets($0.map { $0.0 }) }
     }
 
     /// Init an action sheet with photos on it.
     ///
     /// - Parameters:
     ///   - actions: Actions in action sheet.
+    ///   - mediaOption: The media option of the asset you want to select.
     ///   - displayedPhotosLimit: The max count of photos displayed, default is `0`, means unlimited.
     ///   - selectedPhotosLimit: The max count of photos that can be selected, default is `9`.
     ///   - options: UI options. See `UIOption`
     ///   - didSelectedPhotos: Called after you have selected the photos. Output `UIImage`
     public convenience init(actions: [PhotosSheet.Action],
-                displayedPhotosLimit: Int = 0,
-                selectedPhotosLimit: Int = 9,
-                options: Set<UIOption>? = nil,
-                didSelectedImages: @escaping ([UIImage]) -> ()) {
-        self.init(actions: actions, displayedPhotosLimit: displayedPhotosLimit, selectedPhotosLimit: selectedPhotosLimit, options: options) { didSelectedImages($0.map { $0.1 }) }
+                            mediaOption: MediaOption = .all,
+                            displayedPhotosLimit: Int = 0,
+                            selectedPhotosLimit: Int = 9,
+                            options: Set<UIOption>? = nil,
+                            didSelectedImages: @escaping ([UIImage]) -> ()) {
+        self.init(actions: actions, mediaOption: mediaOption, displayedPhotosLimit: displayedPhotosLimit, selectedPhotosLimit: selectedPhotosLimit, options: options) { didSelectedImages($0.map { $0.1 }) }
     }
 
     override init(nibName nibNameOrNil: String?, bundle nibBundleOrNil: Bundle?) {
@@ -141,8 +150,8 @@ public extension PhotosSheet {
 }
 
 // MARK: - Action
-extension PhotosSheet {
-    public struct Action {
+public extension PhotosSheet {
+    struct Action {
         public let style: ActionStyle
         public let title: String
         public let tintColor: UIColor
@@ -156,8 +165,22 @@ extension PhotosSheet {
         }
     }
 
-    public enum ActionStyle {
+    enum ActionStyle {
         case normal
         case cancel
+    }
+}
+
+// MARK: - Media Type
+public extension PhotosSheet {
+    struct MediaOption: OptionSet {
+        public let rawValue: Int
+        public init(rawValue: Int) {
+            self.rawValue = rawValue
+        }
+
+        public static let photo = MediaOption(rawValue: 1 << 0)
+        public static let video = MediaOption(rawValue: 1 << 1)
+        public static let all: MediaOption = [.photo, .video]
     }
 }

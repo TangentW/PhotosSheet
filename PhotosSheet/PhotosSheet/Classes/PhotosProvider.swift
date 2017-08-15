@@ -12,6 +12,7 @@ import Photos
 fileprivate let photoItemHeight = PhotosSheet.photoItemHeight
 extension PhotosSheet {
     final class PhotosProvider: NSObject, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout {
+        fileprivate let _mediaOption: MediaOption
         fileprivate var _models: [Model] = []
         fileprivate var _selectedModels: [Model] = [] {
             didSet {
@@ -28,7 +29,8 @@ extension PhotosSheet {
         fileprivate let _displayedPhotosLimit: Int
         fileprivate let _selectedPhotosLimit: Int
 
-        init(collectionView: UICollectionView, displayedPhotosLimit: Int, selectedPhotosLimit: Int) {
+        init(collectionView: UICollectionView, mediaOption: MediaOption, displayedPhotosLimit: Int, selectedPhotosLimit: Int) {
+            _mediaOption = mediaOption
             _displayedPhotosLimit = displayedPhotosLimit
             _selectedPhotosLimit = selectedPhotosLimit
             super.init()
@@ -48,11 +50,22 @@ fileprivate extension PhotosSheet.PhotosProvider {
 
     func _loadAssets() {
         DispatchQueue.global().async { [weak self] in
-            let assets = PhotosSheet.PhotosManager.shared.obtainRecentAssets(limit: self?._displayedPhotosLimit ?? 0)
+            let assets = PhotosSheet.PhotosManager.shared.obtainRecentAssets(mediaOption: self?._mediaOption ?? .all, limit: self?._displayedPhotosLimit ?? 0)
             DispatchQueue.main.async { [weak self] in
                 self?._models = assets.map(PhotosSheet.Model.init)
                 self?._collectionView?.reloadData()
+                // Called in next Runloop cycle, layout checkboxs.
+                // Because in this Runloop cycle, collection view cells have not yet been created.
+                DispatchQueue.main.async { [weak self] in
+                    self?._layoutCheckboxs()
+                }
             }
+        }
+    }
+
+    func _layoutCheckboxs() {
+        if let collectionView = _collectionView {
+            scrollViewDidScroll(collectionView)
         }
     }
 }
