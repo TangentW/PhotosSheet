@@ -149,7 +149,7 @@ extension PhotosSheet.PhotosDisplayController {
             view.layer.shadowColor = UIColor.black.cgColor
             view.layer.shadowOffset = CGSize(width: 1, height: 1)
             view.layer.shadowRadius = 1
-            view.layer.shadowOpacity = 0.7
+            view.layer.shadowOpacity = 0.5
             return view
         }()
     }

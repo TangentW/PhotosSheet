@@ -121,11 +121,11 @@ extension PhotosSheet.PhotosManager {
 fileprivate extension NSPredicate {
     convenience init?(mediaOption: PhotosSheet.MediaOption) {
         switch mediaOption {
-        case .photo:
+        case PhotosSheet.MediaOption.photo:
             self.init(format: "mediaType == %d", PHAssetMediaType.image.rawValue)
-        case .video:
+        case PhotosSheet.MediaOption.video:
             self.init(format: "mediaType == %d", PHAssetMediaType.video.rawValue)
-        case .all:
+        case PhotosSheet.MediaOption.all:
             self.init(format: "mediaType == %d || mediaType == %d", PHAssetMediaType.image.rawValue, PHAssetMediaType.video.rawValue)
         default:
             return nil

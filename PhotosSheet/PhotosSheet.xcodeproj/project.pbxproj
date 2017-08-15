@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		BA47E9A71F42FFB100919355 /* SystemConfiguration.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BA47E9A61F42FFB100919355 /* SystemConfiguration.framework */; };
 		BA7DF81A1F41A0BD00D5245A /* ProgressViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA7DF8191F41A0BD00D5245A /* ProgressViewController.swift */; };
 		BAD8AC3E1F41DFB60040C4AB /* PhotosProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAD8AC3D1F41DFB60040C4AB /* PhotosProvider.swift */; };
 		BAD8AC401F41E1020040C4AB /* UI.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAD8AC3F1F41E1020040C4AB /* UI.swift */; };
@@ -21,6 +22,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		BA47E9A61F42FFB100919355 /* SystemConfiguration.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SystemConfiguration.framework; path = System/Library/Frameworks/SystemConfiguration.framework; sourceTree = SDKROOT; };
 		BA7DF8191F41A0BD00D5245A /* ProgressViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressViewController.swift; sourceTree = "<group>"; };
 		BAD8AC3D1F41DFB60040C4AB /* PhotosProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotosProvider.swift; sourceTree = "<group>"; };
 		BAD8AC3F1F41E1020040C4AB /* UI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UI.swift; sourceTree = "<group>"; };
@@ -42,12 +44,21 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				BA47E9A71F42FFB100919355 /* SystemConfiguration.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		BA47E9A51F42FFB100919355 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				BA47E9A61F42FFB100919355 /* SystemConfiguration.framework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 		BAD8AC4B1F41E7B90040C4AB /* Classes */ = {
 			isa = PBXGroup;
 			children = (
@@ -69,6 +80,7 @@
 			children = (
 				BAE74EC21F3F7C4E000C9814 /* PhotosSheet */,
 				BAE74EC11F3F7C4E000C9814 /* Products */,
+				BA47E9A51F42FFB100919355 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};

@@ -128,6 +128,15 @@ public extension PhotosSheet {
             })
         }
 
+        _contentController.dismissProgressViewControllerCallback = { [weak self] in
+            UIView.animate(withDuration: 0.25, animations: { 
+                self?._progressViewController.view.alpha = 0
+            }) { _ in
+                self?._progressViewController.view.removeFromSuperview()
+                self?._progressViewController.removeFromParentViewController()
+            }
+        }
+
         _contentController.progressUpdateCallback = { [weak self] in
             self?._progressViewController.progress = $0
         }
