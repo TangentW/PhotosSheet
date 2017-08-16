@@ -7,7 +7,7 @@
 
 import UIKit
 import SystemConfiguration
-import AVFoundation
+import Photos
 
 // MARK: - Tools
 extension UIImage {
@@ -22,20 +22,57 @@ extension UIImage {
             return self
         }
     }
+}
 
-    var fileSize: Int {
-        guard let data = UIImagePNGRepresentation(self) else { return 0 }
-        return data.count
+extension PHAsset {
+    // Do not call in main thread
+    var imageURL: URL? {
+        // Only for image
+        guard mediaType == .image else { return nil }
+        var url: URL? = nil
+        let group = DispatchGroup()
+        group.enter()
+        requestContentEditingInput(with: nil) { input, _ in
+            url = input?.fullSizeImageURL
+            group.leave()
+        }
+        group.wait()
+        return url
+    }
+
+    // Do not call in main thread
+    var videoURL: URL? {
+        guard mediaType == .video else { return nil }
+        let options = PHVideoRequestOptions()
+        options.version = .original
+        var ret: URL?
+        let group = DispatchGroup()
+        group.enter()
+        PHImageManager.default().requestAVAsset(forVideo: self, options: options) { avAsset, _, _ in
+            ret = (avAsset as? AVURLAsset)?.url
+            group.leave()
+        }
+        group.wait()
+        return ret
+    }
+
+    // Do not call in main thread
+    var url: URL? {
+        switch mediaType {
+        case .image:
+            return imageURL
+        case .video:
+            return videoURL
+        default:
+            return nil
+        }
     }
 }
 
-extension AVAsset {
+extension URL {
     var fileSize: Int {
-        return tracks.reduce(0) { p, n in
-            let rate = n.estimatedDataRate / 8
-            let seconds = CMTimeGetSeconds(n.timeRange.duration)
-            return Int(rate * Float(seconds)) + p
-        }
+        let size = try? resourceValues(forKeys: [.fileSizeKey]).fileSize
+        return (size ?? 0) ?? 0
     }
 }
 

@@ -94,9 +94,6 @@ extension PhotosSheet.PhotosDisplayController {
                 _videoMarkView.isHidden = model.asset.mediaType != .video
                 model.didChangedSelected = { [weak self] didSelected in
                     self?._setupCheckbox(isModelSelected: didSelected)
-                    // TODO: 在WIFI环境下当用户选择照片后进行预下载
-                    // 但是在普通环境下用户要先点击发送按钮才进行下载
-                    // if didSelected { self?.model?.fetchAssetFromLocalOrCloud() }
                 }
                 _checkbox.isHidden = !model.didSelected && _hideCheckbox
             }

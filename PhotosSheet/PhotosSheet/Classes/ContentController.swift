@@ -15,7 +15,7 @@ extension PhotosSheet {
         fileprivate let _normalActionItems: [ActionItem]
         fileprivate let _cancelActionItems: [ActionItem]
 
-        var showSendOriginalsButton = false
+        var isShowSendOriginalsButton = false
 
         // Callback
         var dismissCallback: (() -> ())?
@@ -24,7 +24,7 @@ extension PhotosSheet {
         var progressUpdateCallback: ((Double) -> ())?
 
         fileprivate var _selectedModels: [Model] = []
-        var didSelectedPhotos: (([(PHAsset, UIImage, AVAsset?)]) -> ())?
+        var didSelectedAssets: (([PHAsset], Bool) -> ())?
 
         // WorkItem For Fetching Photos
         fileprivate var _photosFetchingWorkItem: DispatchWorkItem?
@@ -105,7 +105,7 @@ extension PhotosSheet {
         fileprivate lazy var _sendPhotoBtn: ActionItem = {
             let firstItemColor = self._normalActionItems.first?._action.tintColor ?? .green
             let action = Action(title: "Send".localizedString, tintColor: firstItemColor, action: { [weak self] in
-                self?._sendBtnAction(isSendingOriginal: false)
+                self?._sendBtnAction(isSendingOriginals: false)
             })
             let view = ActionItem(action: action)
             view.isHidden = true
@@ -115,7 +115,7 @@ extension PhotosSheet {
         fileprivate lazy var _sendOriginalsBtn: ActionItem = {
             let firstItemColor = self._normalActionItems.first?._action.tintColor ?? .green
             let action = Action(title: "Send Originals".localizedString, tintColor: firstItemColor, action: { [weak self] in
-                self?._sendBtnAction(isSendingOriginal: true)
+                self?._sendBtnAction(isSendingOriginals: true)
             })
             let view = ActionItem(action: action)
             view.isHidden = true
@@ -207,7 +207,7 @@ fileprivate extension PhotosSheet.ContentController {
         }
         if _normalActionItems.count > 0 {
             _contentViewForNormal.addSubview(_sendPhotoBtn)
-            if showSendOriginalsButton {
+            if isShowSendOriginalsButton {
                 _contentViewForNormal.addSubview(_sendOriginalsBtn)
             }
         }
@@ -226,7 +226,7 @@ fileprivate extension PhotosSheet.ContentController {
             view.frame = CGRect(x: 0, y: CGFloat(index) * (PhotosSheet.actionSheetItemHeight + 0.5), width: self.view.bounds.width, height: PhotosSheet.actionSheetItemHeight)
         }
 
-        if showSendOriginalsButton {
+        if isShowSendOriginalsButton {
             _sendPhotoBtn.frame = CGRect(x: 0, y: _photosDisplayViewHeight, width: 0.5 * view.bounds.width - 0.25, height: PhotosSheet.actionSheetItemHeight)
             _sendOriginalsBtn.frame = CGRect(x: 0.5 * view.bounds.width + 0.25, y: _photosDisplayViewHeight, width: 0.5 * view.bounds.width - 0.25, height: PhotosSheet.actionSheetItemHeight)
         } else {
@@ -240,7 +240,7 @@ fileprivate extension PhotosSheet.ContentController {
     func _switchToShowSendButton(models: [PhotosSheet.Model]) {
         let assetsCount = models.count
         let isShow = assetsCount > 0
-        // 必须当ActionSheet至少有一个Action的时候才显示发送按钮
+        // Show send button when actions count greater than zero
         if let firstItem = _normalActionItems.first {
             if !isShow {
                 firstItem.isHidden = false
@@ -257,65 +257,56 @@ fileprivate extension PhotosSheet.ContentController {
         }
     }
 
-    func _calcTotalSizeAndShowAlert(photos: [(PHAsset, UIImage, AVAsset?)]) {
-        DispatchQueue.global().async {
-            let sizeString = (obtainImagesSize() + obtainVideoSize()).sizeString
-            DispatchQueue.main.async {
-                showAlertController(sizeString: sizeString)
-            }
-        }
-
-        // Functions
-        func obtainImagesSize() -> Int {
-            var totalSize: Int = 0
-            for photo in photos {
-                guard photo.0.mediaType == .image else { continue }
-                autoreleasepool {
-                    totalSize += photo.1.fileSize
+    func _showTotalSizeAlert(assets: [PHAsset], confirm: @escaping () -> ()) {
+        func calcSize(completionHandler: @escaping (Int) -> ()) {
+            DispatchQueue.global().async {
+                let urls = assets.map { $0.url }
+                DispatchQueue.main.async {
+                    let size = urls.reduce(0) { p, n in
+                        return p + (n?.fileSize ?? 0)
+                    }
+                    completionHandler(size)
                 }
             }
-            return totalSize
         }
 
-        func obtainVideoSize() -> Int {
-            return photos.reduce(0) { p, n in
-                p + (n.2?.fileSize ?? 0)
-            }
-        }
-
-        func showAlertController(sizeString: String) {
-            let tipMessage = "The total size is".localizedString + sizeString + "," + "Send".localizedString + "?"
+        func showAlert(size: Int) {
+            let tipMessage = "The total size is".localizedString + " " + size.sizeString + ", " + "Send".localizedString + "?"
             let alertController = UIAlertController(title: "Send Originals".localizedString, message: tipMessage, preferredStyle: .alert)
-            let confirmAction = UIAlertAction(title: "Confirm".localizedString, style: .default) { [weak self] _ in
-                self?._sendPhotosAction(photos)
+            let confirmAction = UIAlertAction(title: "Confirm".localizedString, style: .default) { _ in
+                confirm()
             }
-            let cancelAction = UIAlertAction(title: "Cancel".localizedString, style: .cancel) { [weak self] _ in
-                self?.dismissProgressViewControllerCallback?()
-            }
+            let cancelAction = UIAlertAction(title: "Cancel".localizedString, style: .cancel)
             alertController.addAction(confirmAction)
             alertController.addAction(cancelAction)
             present(alertController, animated: true, completion: nil)
         }
+
+        calcSize {
+            showAlert(size: $0)
+        }
     }
 
-    func _sendBtnAction(isSendingOriginal: Bool) {
+    func _sendBtnAction(isSendingOriginals: Bool) {
         showProgressViewControllerCallback?()
         _setupProgressListening()
-        _photosFetchingWorkItem = _selectedModels.fetchVideosAndPhotos { [weak self] in
-            guard let `self` = self else { return }
-            // When the device not in wifi and showing send originals button, show alert controller
-            if self.showSendOriginalsButton && NetworkState.checkCurrentState() == .WWAN {
-                self._calcTotalSizeAndShowAlert(photos: $0)
+        _photosFetchingWorkItem = _selectedModels.fetchVideosAndImages { [weak self] assets in
+            self?.progressUpdateCallback?(1)
+            self?.dismissProgressViewControllerCallback?()
+            // When the device not in wifi and send originals, show alert controller
+            if isSendingOriginals && NetworkState.checkCurrentState() == .WWAN {
+                self?._showTotalSizeAlert(assets: assets) { [weak self] in
+                    self?._sendPhotosAction(assets: assets, isSendingOriginals: isSendingOriginals)
+                }
             } else {
-                self._sendPhotosAction($0)
+                self?._sendPhotosAction(assets: assets, isSendingOriginals: isSendingOriginals)
             }
         }
     }
 
-    func _sendPhotosAction(_ photos: [(PHAsset, UIImage, AVAsset?)]) {
+    func _sendPhotosAction(assets: [PHAsset], isSendingOriginals: Bool) {
         // Send Photos
-        progressUpdateCallback?(1)
-        didSelectedPhotos?(photos)
+        didSelectedAssets?(assets, isSendingOriginals)
         _dismiss()
     }
 

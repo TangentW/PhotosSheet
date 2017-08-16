@@ -13,6 +13,13 @@ public final class PhotosSheet: UIViewController {
     /// All actions in action sheet.
     public let actions: [PhotosSheet.Action]
 
+    /// PhotosSheet is show send originals button.
+    public var isShowSendOriginalsButton: Bool = false {
+        didSet {
+            _contentController.isShowSendOriginalsButton = isShowSendOriginalsButton
+        }
+    }
+
     /// Init an action sheet with photos on it.
     ///
     /// - Parameters:
@@ -21,13 +28,13 @@ public final class PhotosSheet: UIViewController {
     ///   - displayedPhotosLimit: The max count of photos displayed, default is `0`, means unlimited.
     ///   - selectedPhotosLimit: The max count of photos that can be selected, default is `9`.
     ///   - options: UI options. See `UIOption`
-    ///   - didSelectedPhotos: Called after you have selected the photos.
+    ///   - didSelectedAssets: Called after you have selected the photos. |Assets, Is send originals|
     public init(actions: [PhotosSheet.Action],
                 mediaOption: MediaOption = .all,
                 displayedPhotosLimit: Int = 0,
                 selectedPhotosLimit: Int = 9,
                 options: Set<UIOption>? = nil,
-                didSelectedPhotos: @escaping ([(PHAsset, UIImage, AVAsset?)]) -> ()) {
+                didSelectedAssets: @escaping ([PHAsset], Bool) -> ()) {
         // SetupUI
         if let options = options {
             PhotosSheet.setupUI(options: options)
@@ -37,7 +44,7 @@ public final class PhotosSheet: UIViewController {
                                                actions: actions,
                                                displayedPhotosLimit: displayedPhotosLimit,
                                                selectedPhotosLimit: selectedPhotosLimit)
-        _contentController.didSelectedPhotos = didSelectedPhotos
+        _contentController.didSelectedAssets = didSelectedAssets
         super.init(nibName: nil, bundle: nil)
         modalPresentationStyle = .overCurrentContext
         modalTransitionStyle = .crossDissolve
@@ -51,32 +58,14 @@ public final class PhotosSheet: UIViewController {
     ///   - displayedPhotosLimit: The max count of photos displayed, default is `0`, means unlimited.
     ///   - selectedPhotosLimit: The max count of photos that can be selected, default is `9`.
     ///   - options: UI options. See `UIOption`
-    ///   - didSelectedAssets: Called after you have selected the photos. Output `PHAssets`
+    ///   - didSelectedAssets: Called after you have selected the photos.
     public convenience init(actions: [PhotosSheet.Action],
-                            mediaOption: MediaOption = .all,
-                            displayedPhotosLimit: Int = 0,
-                            selectedPhotosLimit: Int = 9,
-                            options: Set<UIOption>? = nil,
-                            didSelectedAssets: @escaping ([PHAsset]) -> ()) {
-        self.init(actions: actions, mediaOption: mediaOption, displayedPhotosLimit: displayedPhotosLimit, selectedPhotosLimit: selectedPhotosLimit, options: options) { didSelectedAssets($0.map { $0.0 }) }
-    }
-
-    /// Init an action sheet with photos on it.
-    ///
-    /// - Parameters:
-    ///   - actions: Actions in action sheet.
-    ///   - mediaOption: The media option of the asset you want to select.
-    ///   - displayedPhotosLimit: The max count of photos displayed, default is `0`, means unlimited.
-    ///   - selectedPhotosLimit: The max count of photos that can be selected, default is `9`.
-    ///   - options: UI options. See `UIOption`
-    ///   - didSelectedPhotos: Called after you have selected the photos. Output `UIImage`
-    public convenience init(actions: [PhotosSheet.Action],
-                            mediaOption: MediaOption = .all,
-                            displayedPhotosLimit: Int = 0,
-                            selectedPhotosLimit: Int = 9,
-                            options: Set<UIOption>? = nil,
-                            didSelectedImages: @escaping ([UIImage]) -> ()) {
-        self.init(actions: actions, mediaOption: mediaOption, displayedPhotosLimit: displayedPhotosLimit, selectedPhotosLimit: selectedPhotosLimit, options: options) { didSelectedImages($0.map { $0.1 }) }
+                mediaOption: MediaOption = .all,
+                displayedPhotosLimit: Int = 0,
+                selectedPhotosLimit: Int = 9,
+                options: Set<UIOption>? = nil,
+                didSelectedAssets: @escaping ([PHAsset]) -> ()) {
+        self.init(actions: actions, mediaOption: mediaOption, displayedPhotosLimit: displayedPhotosLimit, selectedPhotosLimit: selectedPhotosLimit, options: options) { didSelectedAssets($0.0) }
     }
 
     override init(nibName nibNameOrNil: String?, bundle nibBundleOrNil: Bundle?) {
@@ -139,6 +128,11 @@ public extension PhotosSheet {
 
         _contentController.progressUpdateCallback = { [weak self] in
             self?._progressViewController.progress = $0
+        }
+
+        // Handle ProgressViewController callbacks
+        _progressViewController.cancelCallback = { [weak self] _ in
+            self?.dismiss(animated: true, completion: nil)
         }
     }
 

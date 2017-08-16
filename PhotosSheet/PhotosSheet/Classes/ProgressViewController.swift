@@ -7,7 +7,7 @@
 
 import UIKit
 
-fileprivate let progressContentViewSize = CGSize(width: 100, height: 100)
+fileprivate let progressContentViewSize = CGSize(width: 140, height: 140)
 fileprivate let progressViewSize = CGSize(width: 70, height: 70)
 
 final class ProgressViewController: UIViewController {
@@ -34,6 +34,16 @@ final class ProgressViewController: UIViewController {
         return view
     }()
 
+    fileprivate lazy var _cancelBtn: UIButton = {
+        let button = UIButton()
+        button.setTitle("Cancel".localizedString, for: .normal)
+        button.setTitleColor(.white, for: .normal)
+        button.titleLabel?.font = .systemFont(ofSize: 16)
+        button.addTarget(self, action: #selector(ProgressViewController._cancel), for: .touchUpInside)
+        button.autoresizingMask = [.flexibleWidth, .flexibleBottomMargin]
+        return button
+    }()
+
     fileprivate lazy var _contentViewEffect: UIVisualEffect = {
         return UIBlurEffect(style: .light)
     }()
@@ -53,6 +63,12 @@ final class ProgressViewController: UIViewController {
             _progressView.progress = progress
         }
     }
+
+    var cancelCallback: ((ProgressViewController) -> ())?
+
+    @objc fileprivate func _cancel() {
+        cancelCallback?(self)
+    }
 }
 
 extension ProgressViewController {
@@ -61,6 +77,7 @@ extension ProgressViewController {
         view.backgroundColor = .clear
         view.addSubview(_blurView)
         view.addSubview(_contentView)
+        view.addSubview(_cancelBtn)
         _contentView.contentView.addSubview(_progressView)
         _contentView.transform = CGAffineTransform(scaleX: 1.3, y: 1.3)
     }
@@ -71,6 +88,9 @@ extension ProgressViewController {
         _contentView.frame.size = progressContentViewSize
         _contentView.center = CGPoint(x: 0.5 * view.bounds.width, y: 0.5 * view.bounds.height)
         _progressView.center = CGPoint(x: 0.5 * _contentView.bounds.width, y: 0.5 * _contentView.bounds.height)
+        _cancelBtn.sizeToFit()
+        _cancelBtn.center.x = 0.5 * view.bounds.width
+        _cancelBtn.frame.origin.y = _contentView.frame.maxY + 8
     }
 
     override func viewWillAppear(_ animated: Bool) {
