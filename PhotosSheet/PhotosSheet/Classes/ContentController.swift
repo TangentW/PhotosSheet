@@ -16,6 +16,7 @@ extension PhotosSheet {
         fileprivate let _cancelActionItems: [ActionItem]
 
         var isShowSendOriginalsButton = false
+        var sendingActionFilter: PhotosSheet.SendingActionFilter?
 
         // Callback
         var dismissCallback: (() -> ())?
@@ -42,7 +43,6 @@ extension PhotosSheet {
             _normalActionItems = actions.filter { $0.style == .normal }.map(ActionItem.init)
             _cancelActionItems = actions.filter { $0.style == .cancel }.map(ActionItem.init)
             super.init(nibName: nil, bundle: nil)
-            view.autoresizingMask = [.flexibleTopMargin, .flexibleWidth]
         }
 
         deinit {
@@ -60,6 +60,7 @@ extension PhotosSheet {
 
         override func viewDidLoad() {
             super.viewDidLoad()
+            view.autoresizingMask = [.flexibleTopMargin, .flexibleWidth]
             _setupViews()
             _setupGestureRecognizer()
             _photosProvider.changeSelectedModels = { [weak self] models in
@@ -194,6 +195,7 @@ fileprivate extension PhotosSheet.ContentController {
         view.addSubview(_contentViewForCancel)
         _contentViewForNormal.addSubview(_blurViewForNormal)
         addChildViewController(_photosDisplayController)
+        _photosDisplayController.didMove(toParentViewController: self)
         _contentViewForNormal.addSubview(_photosDisplayController.view)
         _contentViewForCancel.addSubview(_blurViewForCancel)
 
@@ -257,57 +259,28 @@ fileprivate extension PhotosSheet.ContentController {
         }
     }
 
-    func _showTotalSizeAlert(assets: [PHAsset], confirm: @escaping () -> ()) {
-        func calcSize(completionHandler: @escaping (Int) -> ()) {
-            DispatchQueue.global().async {
-                let urls = assets.map { $0.url }
-                DispatchQueue.main.async {
-                    let size = urls.reduce(0) { p, n in
-                        return p + (n?.fileSize ?? 0)
-                    }
-                    completionHandler(size)
-                }
-            }
-        }
-
-        func showAlert(size: Int) {
-            let tipMessage = "The total size is".localizedString + " " + size.sizeString + ", " + "Send".localizedString + "?"
-            let alertController = UIAlertController(title: "Send Originals".localizedString, message: tipMessage, preferredStyle: .alert)
-            let confirmAction = UIAlertAction(title: "Confirm".localizedString, style: .default) { _ in
-                confirm()
-            }
-            let cancelAction = UIAlertAction(title: "Cancel".localizedString, style: .cancel)
-            alertController.addAction(confirmAction)
-            alertController.addAction(cancelAction)
-            present(alertController, animated: true, completion: nil)
-        }
-
-        calcSize {
-            showAlert(size: $0)
-        }
-    }
-
     func _sendBtnAction(isSendingOriginals: Bool) {
         showProgressViewControllerCallback?()
         _setupProgressListening()
         _photosFetchingWorkItem = _selectedModels.fetchVideosAndImages { [weak self] assets in
             self?.progressUpdateCallback?(1)
             self?.dismissProgressViewControllerCallback?()
-            // When the device not in wifi and send originals, show alert controller
-            if isSendingOriginals && NetworkState.checkCurrentState() == .WWAN {
-                self?._showTotalSizeAlert(assets: assets) { [weak self] in
-                    self?._sendPhotosAction(assets: assets, isSendingOriginals: isSendingOriginals)
-                }
-            } else {
-                self?._sendPhotosAction(assets: assets, isSendingOriginals: isSendingOriginals)
-            }
+            self?._sendPhotosAction(assets: assets, isSendingOriginals: isSendingOriginals)
         }
     }
 
     func _sendPhotosAction(assets: [PHAsset], isSendingOriginals: Bool) {
-        // Send Photos
-        didSelectedAssets?(assets, isSendingOriginals)
-        _dismiss()
+        // Create sending handler.
+        let sendingHandler = { [weak self] in
+            self?.didSelectedAssets?(assets, isSendingOriginals)
+            self?._dismiss()
+        }
+        // Call filter.
+        if let filter = sendingActionFilter {
+            filter(assets, isSendingOriginals, sendingHandler)
+        } else {
+            sendingHandler()
+        }
     }
 
     func _setupProgressListening() {
@@ -331,6 +304,7 @@ extension PhotosSheet.ContentController {
         let expireY = viewController.view.bounds.height - PhotosSheet.actionSheetVerticalMargin - height
         view.frame = CGRect(x: PhotosSheet.actionSheetHorizontalMargin, y: viewController.view.bounds.height, width: viewController.view.bounds.width - 2 * PhotosSheet.actionSheetHorizontalMargin, height: height)
         viewController.addChildViewController(self)
+        didMove(toParentViewController: viewController)
         viewController.view.addSubview(view)
         UIView.animate(withDuration: 0.25) {
             self.view.frame.origin.y = expireY

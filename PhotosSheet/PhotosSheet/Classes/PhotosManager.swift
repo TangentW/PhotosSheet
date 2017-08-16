@@ -9,15 +9,15 @@ import UIKit
 import Photos
 
 // MARK: - PhotosManager
-extension PhotosSheet {
+public extension PhotosSheet {
     final class PhotosManager {
-        static let shared = PhotosManager()
+        public static let shared = PhotosManager()
         private init() { }
     }
 }
 
 // For Photos
-extension PhotosSheet.PhotosManager {
+public extension PhotosSheet.PhotosManager {
     // ResultImage
     typealias ImageRequestCompletionHandler = (UIImage) -> ()
     // Progress, Stop
@@ -76,7 +76,7 @@ extension PhotosSheet.PhotosManager {
 }
 
 // For Video
-extension PhotosSheet.PhotosManager {
+public extension PhotosSheet.PhotosManager {
     @discardableResult
     func fetchVideo(with asset: PHAsset, // Media type must be video, This function do not judge.
                     progressHandler: DownloadProgressHandler?,
@@ -95,7 +95,7 @@ extension PhotosSheet.PhotosManager {
     }
 }
 
-extension PhotosSheet.PhotosManager {
+public extension PhotosSheet.PhotosManager {
     enum PhotoFetchType {
         case thumbnail(height: CGFloat)
         case original

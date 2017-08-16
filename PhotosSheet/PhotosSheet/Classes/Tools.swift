@@ -6,10 +6,9 @@
 //
 
 import UIKit
-import SystemConfiguration
 import Photos
 
-// MARK: - Tools
+// MARK: - Private
 extension UIImage {
     func scaleTo(size: CGSize) -> UIImage? {
         if self.size.width > size.width {
@@ -97,32 +96,24 @@ extension String {
     }
 }
 
-enum NetworkState {
-    case offline
-    case WIFI
-    case WWAN
-}
-
-extension NetworkState {
-    static func checkCurrentState() -> NetworkState {
-        var zeroAddress = sockaddr_in()
-        zeroAddress.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
-        zeroAddress.sin_family = sa_family_t(AF_INET)
-
-        guard let defaultRouteReachability = withUnsafePointer(to: &zeroAddress, {
-            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
-                SCNetworkReachabilityCreateWithAddress(nil, $0)
+// MARK: - Public
+public extension Array where Element == PHAsset {
+    func calcSize(completionHandler: @escaping (Int) -> ()) {
+        DispatchQueue.global().async {
+            let urls = self.map { $0.url }
+            DispatchQueue.main.async {
+                let size = urls.reduce(0) { p, n in
+                    return p + (n?.fileSize ?? 0)
+                }
+                completionHandler(size)
             }
-        }) else { return .offline }
-
-        var flags: SCNetworkReachabilityFlags = []
-        if !SCNetworkReachabilityGetFlags(defaultRouteReachability, &flags) {
-            return .offline
         }
+    }
 
-        let isReachable = flags.contains(.reachable)
-        let needsConnection = flags.contains(.connectionRequired)
-        guard isReachable && !needsConnection else { return .offline }
-        return flags.contains(.isWWAN) ? .WWAN : .WIFI
+    func calcSizeString(completionHandler: @escaping (String) -> ()) {
+        calcSize {
+            completionHandler($0.sizeString)
+        }
     }
 }
+

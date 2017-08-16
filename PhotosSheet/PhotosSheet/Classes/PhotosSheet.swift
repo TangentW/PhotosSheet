@@ -20,6 +20,22 @@ public final class PhotosSheet: UIViewController {
         }
     }
 
+    /// Filter before you have selected the photos.
+    ///
+    ///    let filter: SendingActionFilter = { assets, isOriginals, send in
+    ///        assets.calcSize { size in
+    ///            // Less than 10 MB
+    ///            let canSend = size < 10 * 1024 * 1024
+    ///            send()
+    ///        }
+    ///    }
+    ///
+    public var sendingActionFilter: SendingActionFilter? = nil {
+        didSet {
+            _contentController.sendingActionFilter = sendingActionFilter
+        }
+    }
+
     /// Init an action sheet with photos on it.
     ///
     /// - Parameters:
@@ -111,6 +127,7 @@ public extension PhotosSheet {
         _contentController.showProgressViewControllerCallback = { [weak self] in
             guard let `self` = self else { return }
             self.addChildViewController(self._progressViewController)
+            self._progressViewController.didMove(toParentViewController: self)
             self.view.addSubview(self._progressViewController.view)
             UIView.animate(withDuration: 0.25, animations: {
                 self._progressViewController.view.alpha = 1
@@ -122,6 +139,7 @@ public extension PhotosSheet {
                 self?._progressViewController.view.alpha = 0
             }) { _ in
                 self?._progressViewController.view.removeFromSuperview()
+                self?._progressViewController.willMove(toParentViewController: nil)
                 self?._progressViewController.removeFromParentViewController()
             }
         }
@@ -186,4 +204,9 @@ public extension PhotosSheet {
         public static let video = MediaOption(rawValue: 1 << 1)
         public static let all: MediaOption = [.photo, .video]
     }
+}
+
+// MARK: - Sending Action
+public extension PhotosSheet {
+    typealias SendingActionFilter = ([PHAsset], Bool, @escaping () -> ()) -> ()
 }

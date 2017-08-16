@@ -12,9 +12,14 @@ import Photos
 extension PhotosSheet {
     class Model {
         let asset: PHAsset
-        fileprivate(set) var size: Int = 0
+
         fileprivate let _semaphore = DispatchSemaphore(value: 1)
-        fileprivate var _downloadTask: PHImageRequestID?
+
+        fileprivate var _downloadTask: PHImageRequestID? {
+            willSet {
+                _cancelTask()
+            }
+        }
 
         var didSelected: Bool = false {
             didSet {
@@ -48,11 +53,11 @@ extension PhotosSheet.Model: Hashable {
 extension PhotosSheet.Model {
     // !!Synchronous!! Do not call in main thread
     func fetchImageFromLocalOrCloud() {
+        assert(Thread.current != Thread.main, "Do not call this function in main thread!")
         _semaphore.wait()
         defer {
             _semaphore.signal()
         }
-        _cancelTask()
         // If asset type is video, fetch first frame image
         _downloadTask = PhotosSheet.PhotosManager.shared.fetchPhoto(with: asset, type: .original, isSynchronous: true, progressHandler: { [weak self] progress, _ in
             DispatchQueue.main.async {
@@ -63,11 +68,11 @@ extension PhotosSheet.Model {
 
     // !!Synchronous!! Do not call in main thread
     func fetchVideoFromLocalOrCloud() {
+        assert(Thread.current != Thread.main, "Do not call this function in main thread!")
         _semaphore.wait()
         defer {
             _semaphore.signal()
         }
-        _cancelTask()
         // If mediaType not is video, callback nil.
         guard asset.mediaType == .video else { return }
         let group = DispatchGroup()

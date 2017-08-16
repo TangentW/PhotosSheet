@@ -8,7 +8,7 @@
 import UIKit
 
 fileprivate let progressContentViewSize = CGSize(width: 140, height: 140)
-fileprivate let progressViewSize = CGSize(width: 70, height: 70)
+fileprivate let progressViewSize = CGSize(width: 100, height: 100)
 
 final class ProgressViewController: UIViewController {
     init() {
