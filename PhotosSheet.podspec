@@ -8,15 +8,15 @@
 
 Pod::Spec.new do |s|
   s.name         = "PhotosSheet"
-  s.version      = "1.1.0"
+  s.version      = "2.0.0"
   s.summary      = "A photo selection control that has action sheet style."
   s.homepage     = "https://github.com/TangentW/PhotosSheet"
   s.license      = "MIT"
   s.author       = { "Tangent" => "805063400@qq.com" }
   s.platform     = :ios
   s.ios.deployment_target = "9.0"
-  s.source       = { :git => "https://github.com/TangentW/PhotosSheet.git", :tag => "1.1.0" }
-  s.source_files  = "PhotosSheet/PhotosSheet/*.swift"
+  s.source       = { :git => "https://github.com/TangentW/PhotosSheet.git", :tag => "2.0.0" }
+  s.source_files  = "PhotosSheet/PhotosSheet/Classes/*.swift"
   s.resources = "PhotosSheet/PhotosSheet/*.{xcassets,lproj}"
-  s.frameworks  = "UIKit", "Photos"
+  s.frameworks  = "UIKit", "Photos", "SystemConfiguration"
 end
