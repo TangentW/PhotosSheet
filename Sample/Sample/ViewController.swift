@@ -8,53 +8,99 @@
 
 import UIKit
 import PhotosSheet
+import Photos
+
+fileprivate let margin: CGFloat = 8
 
 class ViewController: UIViewController {
 
     @IBOutlet weak var imagesCollectionView: UICollectionView!
+    @IBOutlet weak var imagesLayout: UICollectionViewFlowLayout!
     @IBOutlet weak var showBtn: UIButton!
 
-    fileprivate var _images: [UIImage] = [] {
+    fileprivate var _images: [UIImage?] = [] {
         didSet {
             imagesCollectionView.reloadData()
         }
     }
+
+    let itemSize: CGSize = {
+        let countPerRow: CGFloat = 2
+        let sizeValue = (UIScreen.main.bounds.width - (countPerRow - 1) * margin) / countPerRow
+        return CGSize(width: sizeValue, height: sizeValue)
+    }()
     
     override func viewDidLoad() {
         super.viewDidLoad()
         showBtn.addTarget(self, action: #selector(ViewController.showSheet), for: .touchUpInside)
-        imagesCollectionView.delegate = self
         imagesCollectionView.dataSource = self
         imagesCollectionView.register(ImageItem.self, forCellWithReuseIdentifier: String(describing: ImageItem.self))
+        imagesLayout.itemSize = itemSize
+        imagesLayout.minimumLineSpacing = margin
+        imagesLayout.minimumInteritemSpacing = margin
+    }
+
+    lazy var options: Set<PhotosSheet.UIOption> = [
+        .photoItemCheckboxRightMargin(5),
+        .actionSheetItemHeight(57),
+        .actionSheetCorners(12),
+        .actionSheetFont(.systemFont(ofSize: 20))
+    ]
+
+    lazy var filter: PhotosSheet.SendingActionFilter = { [weak self] assets, isOriginal, send in
+        assets.calcSize { [weak self] size in
+            let canSend = size < 10 * 1024 * 1024
+            if canSend {
+                send()
+            } else {
+                let alertController = UIAlertController(title: "Warning", message: "Photos size is too large, still want to send?", preferredStyle: .alert)
+                let confirmAction = UIAlertAction(title: "Yes", style: .default) { _ in
+                    send()
+                }
+                let cancelAction = UIAlertAction(title: "No", style: .cancel)
+                alertController.addAction(confirmAction)
+                alertController.addAction(cancelAction)
+                self?.present(alertController, animated: true, completion: nil)
+            }
+        }
     }
 
     @objc func showSheet() {
         let openCamera = PhotosSheet.Action(title: "Open Camera", tintColor: .green) {
-            print("Show Camera")
+            print("Open Camera")
         }
-        let openAlbum = PhotosSheet.Action(title: "Show Album", tintColor: .green) { 
-            print("Show Album")
+        let openAlbum = PhotosSheet.Action(title: "Open Album", tintColor: .green) {
+            print("Open Album")
         }
-        let canel = PhotosSheet.Action(style: .cancel, title: "Cancel", tintColor: .red) {
+        let cancel = PhotosSheet.Action(style: .cancel, title: "Cancel", tintColor: .red) {
             print("Cancel")
         }
 
-        let photosSheet = PhotosSheet(actions: [openCamera, openAlbum, canel],
-                                      displayedPhotosLimit: 3,
-                                      selectedPhotosLimit: 2,
-                                      didSelectedImages: { [weak self] images in
-                                        self?._images = images
-        })
+        let photosSheet = PhotosSheet(actions: [openCamera, openAlbum, cancel],
+                                      mediaOption: .photo,
+                                      displayedPhotosLimit: 50,
+                                      selectedPhotosLimit: 4,
+                                      options: options) { [weak self] assets in
+                                        self?._sendAssets(assets)
+        }
+//        photosSheet.isShowSendOriginalsButton = true
+        photosSheet.sendingActionFilter = filter
         present(photosSheet, animated: true, completion: nil)
+    }
+
+    fileprivate func _sendAssets(_ assets: [PHAsset]) {
+        _images = assets.flatMap {
+            var image: UIImage?
+            PhotosSheet.PhotosManager.shared.fetchPhoto(with: $0, type: .thumbnail(height: self.itemSize.height), isSynchronous: true, completionHandler: { result in
+                image = result
+            })
+            return image
+        }
+
     }
 }
 
-extension ViewController: UICollectionViewDelegateFlowLayout, UICollectionViewDataSource {
-    func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
-        let height: CGFloat = 200
-        return CGSize(width: collectionView.bounds.width, height: height)
-    }
-
+extension ViewController: UICollectionViewDataSource {
     func numberOfSections(in collectionView: UICollectionView) -> Int {
         return 1
     }

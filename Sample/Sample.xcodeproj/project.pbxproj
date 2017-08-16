@@ -16,7 +16,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		BAE74EF11F3F8098000C9814 /* Embed Frameworks */ = {
+		BAA760291F4427340033B487 /* Embed Frameworks */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
@@ -114,9 +114,9 @@
 				BAE74ED41F3F7EEB000C9814 /* Sources */,
 				BAE74ED51F3F7EEB000C9814 /* Frameworks */,
 				BAE74ED61F3F7EEB000C9814 /* Resources */,
-				BAE74EF11F3F8098000C9814 /* Embed Frameworks */,
 				9F9796FC684F94523A62F423 /* [CP] Embed Pods Frameworks */,
 				6A5D7509C032E6426761A60C /* [CP] Copy Pods Resources */,
+				BAA760291F4427340033B487 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);

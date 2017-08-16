@@ -1,5 +1,5 @@
 use_frameworks!
 
 target 'Sample' do
-	pod "PhotosSheet"
+	pod 'PhotosSheet'
 end
