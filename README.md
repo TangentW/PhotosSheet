@@ -35,7 +35,7 @@ github "TangentW/PhotosSheet"
 Run `carthage update` to build the framework and drag into your project.
 
 ###  Cocoapods
-Add `PhotosSheet` in your `Profile`:
+Add `PhotosSheet` in your `Podfile`:
 
 ```
 use_frameworks!
