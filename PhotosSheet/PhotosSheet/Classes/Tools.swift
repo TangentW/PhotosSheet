@@ -24,61 +24,55 @@ extension UIImage {
 }
 
 extension PHAsset {
-    // Do not call in main thread
-    var imageURL: URL? {
-        // Only for image
-        guard mediaType == .image else { return nil }
-        var url: URL? = nil
-        let group = DispatchGroup()
-        group.enter()
-        requestContentEditingInput(with: nil) { input, _ in
-            url = input?.fullSizeImageURL
-            group.leave()
+    var imageFileSize: Int {
+        assert(!Thread.current.isMainThread, "Do not call it in main thread!")
+        var fileSize = 0
+        PhotosSheet.PhotosManager.shared.fetchPhoto(with: self, type: .original, isSynchronous: true) {
+            let data = UIImageJPEGRepresentation($0, 1)
+            fileSize = data?.count ?? 0
         }
-        group.wait()
-        return url
+        return fileSize
     }
 
-    // Do not call in main thread
-    var videoURL: URL? {
-        guard mediaType == .video else { return nil }
+    var videoFileSize: Int {
+        assert(!Thread.current.isMainThread, "Do not call it in main thread!")
         let options = PHVideoRequestOptions()
         options.version = .original
-        var ret: URL?
+        var ret = 0
         let group = DispatchGroup()
         group.enter()
         PHImageManager.default().requestAVAsset(forVideo: self, options: options) { avAsset, _, _ in
-            ret = (avAsset as? AVURLAsset)?.url
+            ret = (avAsset as? AVURLAsset)?.url.fileSize ?? 0
             group.leave()
         }
         group.wait()
         return ret
     }
 
-    // Do not call in main thread
-    var url: URL? {
+    var fileSize: Int {
+        assert(!Thread.current.isMainThread, "Do not call it in main thread!")
         switch mediaType {
         case .image:
-            return imageURL
+            return imageFileSize
         case .video:
-            return videoURL
+            return videoFileSize
         default:
-            return nil
+            return 0
         }
     }
 }
 
 extension URL {
     var fileSize: Int {
-        let size = try? resourceValues(forKeys: [.fileSizeKey]).fileSize
-        return (size ?? 0) ?? 0
+        guard let resourceValues = try? resourceValues(forKeys: [.fileSizeKey, .totalFileSizeKey]) else { return 0 }
+        return resourceValues.fileSize ?? resourceValues.totalFileSize ?? 0
     }
 }
 
 extension Int {
     var sizeString: String {
         let bcf = ByteCountFormatter()
-        bcf.allowedUnits = [.useMB]
+        bcf.allowedUnits = [.useBytes, .useKB, .useMB]
         bcf.countStyle = .file
         return bcf.string(fromByteCount: Int64(self))
     }
@@ -100,12 +94,15 @@ extension String {
 public extension Array where Element == PHAsset {
     func calcSize(completionHandler: @escaping (Int) -> ()) {
         DispatchQueue.global().async {
-            let urls = self.map { $0.url }
-            DispatchQueue.main.async {
-                let size = urls.reduce(0) { p, n in
-                    return p + (n?.fileSize ?? 0)
+            let urls = self.map { me -> Int in
+                var fileSize = 0
+                autoreleasepool {
+                    fileSize = me.fileSize
                 }
-                completionHandler(size)
+                return fileSize
+            }
+            DispatchQueue.main.async {
+                completionHandler(urls.reduce(0, +))
             }
         }
     }
@@ -116,4 +113,3 @@ public extension Array where Element == PHAsset {
         }
     }
 }
-
