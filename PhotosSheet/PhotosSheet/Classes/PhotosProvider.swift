@@ -95,7 +95,8 @@ extension PhotosSheet.PhotosProvider {
         let asset = _models[indexPath.row].asset
         let ratio = max(CGFloat(asset.pixelWidth) / CGFloat(asset.pixelHeight), 0)
         let maxWidth = collectionView.bounds.width - 20
-        return CGSize(width: min(photoItemHeight * ratio, maxWidth), height: photoItemHeight)
+        let minWith = collectionView.bounds.width * 0.3
+        return CGSize(width: max(min(photoItemHeight * ratio, maxWidth), minWith), height: photoItemHeight)
     }
 }
 
