@@ -301,7 +301,11 @@ fileprivate extension PhotosSheet.ContentController {
 extension PhotosSheet.ContentController {
     func show(from viewController: UIViewController) {
         let height = _expectHeight
-        let expireY = viewController.view.bounds.height - PhotosSheet.actionSheetVerticalMargin - height
+        var bottomSafeAreaInset: CGFloat = 0
+        if #available(iOS 11, *) {
+            bottomSafeAreaInset = viewController.presentingViewController?.view.safeAreaInsets.bottom ?? 0
+        }
+        let expireY = viewController.view.bounds.height - PhotosSheet.actionSheetVerticalMargin - height - bottomSafeAreaInset
         view.frame = CGRect(x: PhotosSheet.actionSheetHorizontalMargin, y: viewController.view.bounds.height, width: viewController.view.bounds.width - 2 * PhotosSheet.actionSheetHorizontalMargin, height: height)
         viewController.addChildViewController(self)
         didMove(toParentViewController: viewController)
