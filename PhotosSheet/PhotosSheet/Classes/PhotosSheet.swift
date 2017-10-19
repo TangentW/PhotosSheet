@@ -50,7 +50,7 @@ public final class PhotosSheet: UIViewController {
                 displayedPhotosLimit: Int = 0,
                 selectedPhotosLimit: Int = 9,
                 options: Set<UIOption>? = nil,
-                didSelectedAssets: @escaping ([PHAsset], Bool) -> ()) {
+                didSelectedOriginalAssets: @escaping ([PHAsset], Bool) -> ()) {
         // SetupUI
         if let options = options {
             PhotosSheet.setupUI(options: options)
@@ -60,7 +60,7 @@ public final class PhotosSheet: UIViewController {
                                                actions: actions,
                                                displayedPhotosLimit: displayedPhotosLimit,
                                                selectedPhotosLimit: selectedPhotosLimit)
-        _contentController.didSelectedAssets = didSelectedAssets
+        _contentController.didSelectedAssets = didSelectedOriginalAssets
         super.init(nibName: nil, bundle: nil)
         modalPresentationStyle = .overCurrentContext
         modalTransitionStyle = .crossDissolve
@@ -81,7 +81,7 @@ public final class PhotosSheet: UIViewController {
                 selectedPhotosLimit: Int = 9,
                 options: Set<UIOption>? = nil,
                 didSelectedAssets: @escaping ([PHAsset]) -> ()) {
-        self.init(actions: actions, mediaOption: mediaOption, displayedPhotosLimit: displayedPhotosLimit, selectedPhotosLimit: selectedPhotosLimit, options: options) { didSelectedAssets($0.0) }
+        self.init(actions: actions, mediaOption: mediaOption, displayedPhotosLimit: displayedPhotosLimit, selectedPhotosLimit: selectedPhotosLimit, options: options) { assets, _ in didSelectedAssets(assets) }
     }
 
     override init(nibName nibNameOrNil: String?, bundle nibBundleOrNil: Bundle?) {
