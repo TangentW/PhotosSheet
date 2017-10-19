@@ -1,5 +1,5 @@
 # PhotosSheet
-[![](https://img.shields.io/badge/language-Swift3.0-orange.svg)](https://github.com/TangentW/PhotosSheet)
+[![](https://img.shields.io/badge/language-Swift4.0-orange.svg)](https://github.com/TangentW/PhotosSheet)
 [![Carthage compatible](https://img.shields.io/badge/Carthage-compatible-4BC51D.svg?style=flat)](https://github.com/Carthage/Carthage)
 [![CocoaPods](https://img.shields.io/cocoapods/v/PhotosSheet.svg)](https://github.com/TangentW/PhotosSheet)
 
@@ -18,7 +18,7 @@ When you select a photo in iCloud, `PhotosSheet` will automatically download it 
 
 ## Requirements
 * iOS 9.0 or higher.
-* Swift 3.0.
+* Swift 4.0.
 * Make sure `photo library usage privacy` have added to you project's `Info.plist`.
 
 ## Demo
