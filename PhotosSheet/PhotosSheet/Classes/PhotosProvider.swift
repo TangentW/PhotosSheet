@@ -93,7 +93,14 @@ extension PhotosSheet.PhotosProvider {
 extension PhotosSheet.PhotosProvider {
     func collectionView(_ collectionView: UICollectionView, layout collectionViewLayout: UICollectionViewLayout, sizeForItemAt indexPath: IndexPath) -> CGSize {
         let asset = _models[indexPath.row].asset
-        let ratio = max(CGFloat(asset.pixelWidth) / CGFloat(asset.pixelHeight), 0)
+
+        let assetWidth = CGFloat(asset.pixelWidth)
+        let assetHeight = CGFloat(asset.pixelHeight)
+        if assetWidth <= 0 || assetHeight <= 0 {
+            return .zero
+        }
+        let ratio = assetWidth / assetHeight
+
         let maxWidth = collectionView.bounds.width - 20
         let minWith = collectionView.bounds.width * 0.3
         return CGSize(width: max(min(photoItemHeight * ratio, maxWidth), minWith), height: photoItemHeight)
