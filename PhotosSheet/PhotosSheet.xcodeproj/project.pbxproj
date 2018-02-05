@@ -22,6 +22,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		A52427D320285E5A005FD208 /* ru */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = ru; path = ru.lproj/Localizable.strings; sourceTree = "<group>"; };
 		BA47E9A61F42FFB100919355 /* SystemConfiguration.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SystemConfiguration.framework; path = System/Library/Frameworks/SystemConfiguration.framework; sourceTree = SDKROOT; };
 		BA7DF8191F41A0BD00D5245A /* ProgressViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProgressViewController.swift; sourceTree = "<group>"; };
 		BAD8AC3D1F41DFB60040C4AB /* PhotosProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotosProvider.swift; sourceTree = "<group>"; };
@@ -157,6 +158,7 @@
 			knownRegions = (
 				en,
 				"zh-Hans",
+				ru,
 			);
 			mainGroup = BAE74EB61F3F7C4E000C9814;
 			productRefGroup = BAE74EC11F3F7C4E000C9814 /* Products */;
@@ -205,6 +207,7 @@
 			children = (
 				BAE74F011F401E5C000C9814 /* en */,
 				BAE74F031F401E74000C9814 /* zh-Hans */,
+				A52427D320285E5A005FD208 /* ru */,
 			);
 			name = Localizable.strings;
 			sourceTree = "<group>";

@@ -1,0 +1,11 @@
+/* 
+  Localizable.strings
+  PhotosSheet
+
+  Created by Tan on 2017/8/13.
+
+*/
+
+"Confirm" = "Подтвердить";
+"Send" = "Отправить";
+"Send Originals" = "Отправить оригинал";
