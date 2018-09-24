@@ -194,8 +194,8 @@ fileprivate extension PhotosSheet.ContentController {
         view.addSubview(_contentViewForNormal)
         view.addSubview(_contentViewForCancel)
         _contentViewForNormal.addSubview(_blurViewForNormal)
-        addChildViewController(_photosDisplayController)
-        _photosDisplayController.didMove(toParentViewController: self)
+        addChild(_photosDisplayController)
+        _photosDisplayController.didMove(toParent: self)
         _contentViewForNormal.addSubview(_photosDisplayController.view)
         _contentViewForCancel.addSubview(_blurViewForCancel)
 
@@ -307,8 +307,8 @@ extension PhotosSheet.ContentController {
         }
         let expireY = viewController.view.bounds.height - PhotosSheet.actionSheetVerticalMargin - height - bottomSafeAreaInset
         view.frame = CGRect(x: PhotosSheet.actionSheetHorizontalMargin, y: viewController.view.bounds.height, width: viewController.view.bounds.width - 2 * PhotosSheet.actionSheetHorizontalMargin, height: height)
-        viewController.addChildViewController(self)
-        didMove(toParentViewController: viewController)
+        viewController.addChild(self)
+        didMove(toParent: viewController)
         viewController.view.addSubview(view)
         UIView.animate(withDuration: 0.25) {
             self.view.frame.origin.y = expireY

@@ -143,7 +143,7 @@ extension ProgressViewController {
             let circle = CAShapeLayer()
             circle.frame = self.layer.bounds
             circle.path = self._circlePath.cgPath
-            circle.lineCap = kCALineCapRound
+            circle.lineCap = CAShapeLayerLineCap.round
             circle.fillColor = UIColor.clear.cgColor
             circle.strokeColor = UIColor.white.cgColor
             circle.strokeStart = 0

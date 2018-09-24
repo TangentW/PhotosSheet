@@ -28,7 +28,7 @@ extension PHAsset {
         assert(!Thread.current.isMainThread, "Do not call it in main thread!")
         var fileSize = 0
         PhotosSheet.PhotosManager.shared.fetchPhoto(with: self, type: .original, isSynchronous: true) {
-            let data = UIImageJPEGRepresentation($0, 1)
+            let data = $0.jpegData(compressionQuality: 1)
             fileSize = data?.count ?? 0
         }
         return fileSize
