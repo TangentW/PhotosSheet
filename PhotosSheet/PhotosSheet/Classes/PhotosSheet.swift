@@ -126,8 +126,8 @@ public extension PhotosSheet {
 
         _contentController.showProgressViewControllerCallback = { [weak self] in
             guard let `self` = self else { return }
-            self.addChildViewController(self._progressViewController)
-            self._progressViewController.didMove(toParentViewController: self)
+            self.addChild(self._progressViewController)
+            self._progressViewController.didMove(toParent: self)
             self.view.addSubview(self._progressViewController.view)
             UIView.animate(withDuration: 0.25, animations: {
                 self._progressViewController.view.alpha = 1
@@ -139,8 +139,8 @@ public extension PhotosSheet {
                 self?._progressViewController.view.alpha = 0
             }) { _ in
                 self?._progressViewController.view.removeFromSuperview()
-                self?._progressViewController.willMove(toParentViewController: nil)
-                self?._progressViewController.removeFromParentViewController()
+                self?._progressViewController.willMove(toParent: nil)
+                self?._progressViewController.removeFromParent()
             }
         }
 
